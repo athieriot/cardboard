@@ -12,7 +12,7 @@ trait Cost
 case object Tapping extends Cost
 case class ManaCost() extends Cost
 
-case class Ability(cost: Cost, effect: (State, Int) => State)
+case class Ability(cost: Cost, effect: (State, String) => State)
 
 trait Card {
   val name: String

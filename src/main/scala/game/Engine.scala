@@ -11,14 +11,23 @@ import monocle.syntax.all._
 import java.util.UUID
 
 object Engine {
+  
+  private val OPENING_HAND = 1
 
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     command match {
+      // TODO: Check deck size
+      case Start(replyTo) =>
+        state.phase match {
+          case None => Effect.persist(state.playerStates.keys.map(Drawn(OPENING_HAND, _)).toSeq).thenReply(replyTo)(state => StatusReply.Success(state))
+          case _ => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Game already in progress"))
+        }
+
       case Draw(replyTo, player, count) =>
         state.playerStates(player).library match {
           // TODO: Should loose then
+          case _ :: _ => Effect.persist(Drawn(count, player)).thenReply(replyTo)(state => StatusReply.Success(state))
           case Nil => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"No more cards in the Library"))
-          case _ => Effect.persist(Drawn(count, player)).thenReply(replyTo)(state => StatusReply.Success(state))
         }
 
       // TODO: Check for current tapStatus
@@ -44,10 +53,14 @@ object Engine {
     }
   }
 
-  def apply(id: UUID, decks: Map[Int, List[Card]]): Behavior[Action] =
+  def apply(id: UUID, decks: Map[String, List[Card]]): Behavior[Action] =
     EventSourcedBehavior.withEnforcedReplies[Action, Event, State](
       persistenceId = PersistenceId.ofUniqueId(id.toString),
-      emptyState = State(0, Phase.draw, decks.map((id, deck) => (id, PlayerState(deck)))),
+      emptyState = State(
+        id,
+        decks.keys.toIndexedSeq(scala.util.Random.nextInt(2)),
+        decks.map((name, deck) => (name, PlayerState(deck)))
+      ),
       commandHandler = commandHandler,
       eventHandler = eventHandler,
     )
