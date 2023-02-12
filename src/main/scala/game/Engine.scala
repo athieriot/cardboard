@@ -4,35 +4,40 @@ import akka.actor.typed.Behavior
 import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
+import cards.{Card, forest}
 import game.*
+import monocle.syntax.all._
 
 import java.util.UUID
 
 object Engine {
 
-  private val commandHandler: (Battleground, Command) => ReplyEffect[Event, Battleground] = { (battleGround, command) =>
+  private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     command match {
-      case Tap(replyTo, name) =>
-        battleGround.lands.find(_._2.name == name) match {
-          case Some(land) => Effect.persist(Tapped(land._1)).thenReply(replyTo)(_ => StatusReply.Success(s"$name tapped"))
+      // TODO: Check for current tapStatus
+      // TODO: Check for Cost
+      case Tap(replyTo, player, name) =>
+        state.battleField.filter(_._2.owner == player).find(_._2.card.name == name) match {
+          case Some(id, _) => Effect.persist(Tapped(id, player)).thenReply(replyTo)(_ => StatusReply.Success(s"$name tapped"))
           case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"No $name found"))
         }
     }
   }
 
-  private val eventHandler: (Battleground, Event) => Battleground = { (battleGround, event) =>
+  private val eventHandler: (State, Event) => State = { (state, event) =>
     event match {
-      case Tapped(id) => battleGround.copy(lands = battleGround.lands.updatedWith(id)(_.map {
-        case l@Land(_, _) => l.copy(state = State.Tapped)
-        case x => x
-      }))
+      case Tapped(id, player) => {
+        // TODO: Manage to Tap before
+        state.battleField(id).card.activatedAbilities("tap").effect(state, player)
+          .focus(_.battleField.index(id).status).replace(Status.Tapped)
+      }
     }
   }
 
-  def apply(id: UUID, cards: Map[Int, Card]): Behavior[Command] =
-    EventSourcedBehavior.withEnforcedReplies[Command, Event, Battleground](
+  def apply(id: UUID, decks: Map[Int, List[Card]]): Behavior[Action] =
+    EventSourcedBehavior.withEnforcedReplies[Action, Event, State](
       persistenceId = PersistenceId.ofUniqueId(id.toString),
-      emptyState = Battleground(cards, 0),
+      emptyState = State(0, Phase.draw, decks.map((id, deck) => (id, PlayerState(deck)))),
       commandHandler = commandHandler,
       eventHandler = eventHandler,
     )

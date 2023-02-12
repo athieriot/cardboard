@@ -4,7 +4,7 @@ import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.pattern.StatusReply
 import akka.util.Timeout
-import game.{Command, Tap}
+import game.{Action, Tap}
 
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
@@ -14,7 +14,7 @@ object CommandLine {
   case object Ready extends Status
   case object Terminate extends Status
 
-  def apply(instance: Behavior[Command]): Behavior[Status] =
+  def apply(instance: Behavior[Action]): Behavior[Status] =
     Behaviors.setup[CommandLine.Status] { context =>
       implicit val timeout: Timeout = 3.seconds
 
@@ -31,7 +31,8 @@ object CommandLine {
             Behaviors.same
           else
             println(s"Tap $input")
-            context.askWithStatus(cardboard, ref => Tap(ref, input)) {
+            // TODO: Set Active Player
+            context.askWithStatus(cardboard, ref => Tap(ref, 0, input)) {
               case Success(text) => println(text); Ready
               case Failure(StatusReply.ErrorMessage(text)) => println(text); Ready
               case Failure(_) => println("An error occurred"); Ready
