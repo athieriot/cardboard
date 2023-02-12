@@ -21,6 +21,8 @@ trait Card {
 case class Land(name: String, staticAbilities: List[String], activatedAbilities: Map[String, Ability]) extends Card
 
 // TODO: Try Monocle
+// TODO: Should it generate commands/events ?
+// TODO: Should use Pattern Matching
 val forest = Land(
   "Forest", List.empty, Map(
     "tap" -> Ability(Tapping, (state, player) => state.focus(_.playerStates.index(player).manaPool.index(Color.red)).modify(_ + 1))
