@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 import monocle.syntax.all.*
 
-case class Deck(cards: List[Card]) {
+case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 
   private val MIN_DECK_SIZE = 40
 
@@ -16,7 +16,7 @@ enum Color {
 }
 
 enum Type {
-  case land
+  case artifact, creature, enchantment, instant, land, planeswalker, sorcery
 }
 
 trait Cost
@@ -29,7 +29,7 @@ case class Ability(cost: Cost, effect: (InProgressState, String) => InProgressSt
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
   Array(
-    new JsonSubTypes.Type(value = classOf[Land], name = "land"),
+    new JsonSubTypes.Type(value = classOf[LandType], name = "landType"),
   )
 )
 trait Card {
@@ -37,16 +37,4 @@ trait Card {
   def activatedAbilities: Map[String, Ability]
 }
 
-case class Land(
-  name: String,
-) extends Card {
-  def activatedAbilities: Map[String, Ability] = {
-    Map(
-      "tap" -> Ability(Tapping, (state, player) => state.focus(_.players.index(player).manaPool.index(Color.red)).modify(_ + 1))
-    )
-  }
-}
-
-// TODO: Should it generate commands/events ?
-// TODO: Should use Pattern Matching
-val forest = Land("Forest")
+val standardDeck: Deck = Deck((1 to 8).flatMap(_ => basicLands).toList)

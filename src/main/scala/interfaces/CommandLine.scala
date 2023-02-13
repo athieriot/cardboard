@@ -23,7 +23,6 @@ object CommandLine {
     Behaviors.setup[CommandLine.Status] { context =>
       implicit val timeout: Timeout = 3.seconds
 
-      val standardDeck: Deck = Deck((1 to 40).map(_ => forest).toList)
       val cardboard = context.spawn(instance, "game")
 
       Behaviors.receiveMessage[CommandLine.Status] {
@@ -31,7 +30,7 @@ object CommandLine {
         case Initiate =>
           SendAction(context, cardboard, Recover.apply, {
             case game.EmptyState => println("No existing game found"); Prepare
-            case state: game.InProgressState => render(state); Ready(state.activePlayer)
+            case state: game.InProgressState => render(state); Ready(state.playersTurn)
             case state => println(s"Wrong state $state"); Terminate
           })
 
@@ -45,7 +44,7 @@ object CommandLine {
           )
 
           SendAction(context, cardboard, ref => New(ref, players), {
-            case state: game.InProgressState => render(state); Ready(state.activePlayer)
+            case state: game.InProgressState => render(state); Ready(state.playersTurn)
             case state => println(s"Wrong state $state"); Terminate
           })
 
@@ -69,7 +68,7 @@ object CommandLine {
             actionOpt.foreach { action =>
               println(s"$input")
               SendAction(context, cardboard, action, {
-                case state: game.InProgressState => render(state); Ready(state.activePlayer)
+                case state: game.InProgressState => render(state); Ready(state.playersTurn)
                 case state => println(s"Wrong state $state"); Terminate
               })
             }
@@ -78,10 +77,12 @@ object CommandLine {
       }
     }
 
-   def SendAction[Command, State](context: ActorContext[CommandLine.Status],
-                                  target: ActorRef[Command],
-                                  request: ActorRef[StatusReply[State]] => Command,
-                                  onSuccess: State => CommandLine.Status)(implicit responseTimeout: Timeout, classTag: ClassTag[State]): Behavior[CommandLine.Status] = {
+   private def SendAction[Command, State](
+    context: ActorContext[CommandLine.Status],
+    target: ActorRef[Command],
+    request: ActorRef[StatusReply[State]] => Command,
+    onSuccess: State => CommandLine.Status)(implicit responseTimeout: Timeout, classTag: ClassTag[State]
+   ): Behavior[CommandLine.Status] = {
      context.askWithStatus(target, request) {
        case Success(state) => onSuccess(state)
        case Failure(StatusReply.ErrorMessage(text)) => println(text); Terminate
@@ -90,14 +91,21 @@ object CommandLine {
      Behaviors.same
   }
 
-  def render(state: InProgressState): Unit = {
-    println(s"Active Player: ${state.activePlayer}")
+  private def render(state: InProgressState): Unit = {
+    println("\n")
+    println("|------------------")
     state.players.foreach { case (i, playerState) =>
-      println(s"Player: $i - Life: ${playerState.life}")
-      println(s"Library: ${playerState.library.length}")
-      println(s"Graveyard: ${playerState.graveyard.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
-      println(s"Hand: ${playerState.hand.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
-      println("\n")
+      val active = if state.playersTurn == i then "⭐ " else ""
+      val priority = if state.priority == i then " 🟢" else ""
+
+      println(s"| Player: $active$i$priority - Life: ${playerState.life}")
+      println(s"| 📚Library: ${playerState.library.size}")
+      println(s"| 🪦Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
+      println(s"| ✋ Hand (${playerState.hand.size}): ${playerState.hand.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
+      println("|------------------")
     }
+    println(s"| Phase: ${Phase.values.map(phase => if state.phase == phase then s"🌙$phase" else phase).mkString(", ")}")
+    println("|------------------")
+    println("\n")
   }
 }

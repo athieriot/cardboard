@@ -1,7 +1,7 @@
 package game
 
 import akka.actor.typed.Behavior
-import akka.pattern.StatusReply
+import akka.pattern.StatusReply.{Success, Error}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import cards.*
@@ -18,37 +18,42 @@ object Engine {
     state match {
       case EmptyState =>
         command match {
-          case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
+          case Recover(replyTo) => Effect.none.thenReply(replyTo)(Success(_))
           case New(replyTo, players: Map[String, Deck]) =>
             if players.exists(!_._2.isValid) then
-              Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Deck invalid"))
+              Effect.none.thenReply(replyTo)(_ => Error(s"Deck invalid"))
             else
+              def randomOrder(n: Int) = scala.util.Random.shuffle(1 to n*2).toList
+              
+              // TODO: How to orchestrate multiple effects and triggers !??
               Effect.persist(
-                Created(scala.util.Random.nextInt(2), players) +: players.keys.map(Drawn(OPENING_HAND, _)).toSeq
-              ).thenReply(replyTo)(state => StatusReply.Success(state))
+                Seq(Created(scala.util.Random.nextInt(players.size), players))
+                  ++ (players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }.toSeq
+                  ++ players.keys.map(Drawn(OPENING_HAND, _)).toSeq)
+              ).thenReply(replyTo)(state => Success(state))
           case _ => Effect.noReply
         }
 
       case state: InProgressState =>
         command match {
-          case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
+          case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => Success(state))
           case Draw(replyTo, player, count) =>
             state.players(player).library match {
               // TODO: Should loose then, but only in the event handler as loosing a world check ?
-              case _ :: _ => Effect.persist(Drawn(count, player)).thenReply(replyTo)(state => StatusReply.Success(state))
-              case Nil => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"No more cards in the Library"))
+              case _ :: _ => Effect.persist(Drawn(count, player)).thenReply(replyTo)(state => Success(state))
+              case Nil => Effect.none.thenReply(replyTo)(_ => Error(s"No more cards in the Library"))
             }
 
           case Discard(replyTo, player, target) =>
             // TODO: Check if in hand ?
-            Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+            Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => Success(state))
 
           // TODO: Check for current tapStatus
           // TODO: Check for Cost
           case Tap(replyTo, player, target) =>
             state.battleField.filter(_._2.owner == player).get(target) match {
-              case Some(_) => Effect.persist(Tapped(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"No target found"))
+              case Some(_) => Effect.persist(Tapped(target, player)).thenReply(replyTo)(state => Success(state))
+              case None => Effect.none.thenReply(replyTo)(_ => Error(s"No target found"))
             }
           case _ => Effect.noReply
         }
@@ -62,12 +67,19 @@ object Engine {
           case Created(die: Int, players: Map[String, Deck]) =>
             InProgressState(
               players.keys.toIndexedSeq(die),
+              players.keys.toIndexedSeq(die),
               players.map((name, deck) => (name, PlayerSide(deck.cards)))
             )
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }
       case state: InProgressState =>
         event match {
+          case Moved(phase) => state.focus(_.phase).replace(phase)
+          case Shuffled(order, player) =>
+            val shuffled = order.zip(state.players(player).library).sortBy(_._1).map(_._2)
+            state.focus(_.players.index(player).library).replace(shuffled)
+
+          // TODO: Should we draw first ?
           case Drawn(count, player) =>
             state.focus(_.players.index(player).hand).modify(_ ++ state.players(player).library.take(count).zipWithIndex.map { case (card, i) => state.highestId + i -> card })
               .focus(_.players.index(player).library).modify(_.drop(count))

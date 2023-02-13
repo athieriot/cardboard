@@ -5,10 +5,6 @@ import cards.*
 import java.util.UUID
 import scala.collection.mutable
 
-// TODO: Need to define order/groups
-enum Phase {
-  case unTap, upKeep, draw, preCombatMain, beginningOfCombat, declareAttackers, declareBlockers, combatDamage, endOfCombat, postCombatMain, end, cleanup
-}
 enum Status {
   case Tapped, Untapped
 }
@@ -36,9 +32,10 @@ case object EmptyState extends State
 // TODO: State = Number of Turns
 case class InProgressState(
   // TODO: Should that be State types ?
-  activePlayer: String,
+  playersTurn: String,
+  priority: String,
   players: Map[String, PlayerSide],
-  phase: Option[Phase] = None,
+  phase: Phase = Phase.preCombatMain,
   stack: Map[CardId, Spell] = Map.empty,
   battleField: Map[CardId, Spell] = Map.empty,
   highestId: CardId = 1,
