@@ -1,18 +1,19 @@
 package interfaces
 
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, Behavior, RecipientRef}
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.pattern.StatusReply
 import akka.util.Timeout
-import cards.{Card, forest}
+import cards.*
 import game.*
 
 import scala.concurrent.duration.*
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 object CommandLine {
-  trait Status
 
+  trait Status
   case object Initiate extends Status
   case object Prepare extends Status
   case class Ready(activePlayer: String) extends Status
@@ -22,35 +23,31 @@ object CommandLine {
     Behaviors.setup[CommandLine.Status] { context =>
       implicit val timeout: Timeout = 3.seconds
 
+      val standardDeck: Deck = Deck((1 to 40).map(_ => forest).toList)
       val cardboard = context.spawn(instance, "game")
 
       Behaviors.receiveMessage[CommandLine.Status] {
         case Terminate => Behaviors.stopped
         case Initiate =>
-          context.askWithStatus(cardboard, Recover.apply) {
-            case Success(game.EmptyState) => println("Game not ready"); Prepare
-            case Success(state: game.InProgressState) => render(state); Ready(state.activePlayer)
-            case Failure(StatusReply.ErrorMessage(text)) => println(text); Terminate
-            case Success(state) => println(s"Wrong state $state"); Terminate
-            case Failure(_) => println("An error occurred"); Terminate
-          }
-          Behaviors.same
+          SendAction(context, cardboard, Recover.apply, {
+            case game.EmptyState => println("No existing game found"); Prepare
+            case state: game.InProgressState => render(state); Ready(state.activePlayer)
+            case state => println(s"Wrong state $state"); Terminate
+          })
 
         case Prepare =>
-          val standardDeck: List[Card] = (1 to 40).map(_ => forest).toList
+          print("Player One: "); val playerOne = scala.io.StdIn.readLine()
+          print("Player Two: "); val playerTwo = scala.io.StdIn.readLine()
 
-          print("Player One ?")
-          val playerOne = scala.io.StdIn.readLine()
-          print("Player Two ?")
-          val playerTwo = scala.io.StdIn.readLine()
+          val players = Map(
+            playerOne -> standardDeck,
+            playerTwo -> standardDeck
+          )
 
-          context.askWithStatus(cardboard, ref => New(ref, Map(playerOne -> standardDeck, playerTwo -> standardDeck))) {
-            case Success(state: game.InProgressState) => render(state); Ready(state.activePlayer)
-            case Failure(StatusReply.ErrorMessage(text)) => println(text); Terminate
-            case Success(state) => println(s"Wrong state $state"); Terminate
-            case Failure(_) => println("An error occurred"); Terminate
-          }
-          Behaviors.same
+          SendAction(context, cardboard, ref => New(ref, players), {
+            case state: game.InProgressState => render(state); Ready(state.activePlayer)
+            case state => println(s"Wrong state $state"); Terminate
+          })
 
         case Ready(activePlayer) =>
           print(s"|$activePlayer|> ")
@@ -60,39 +57,46 @@ object CommandLine {
             context.self ! Terminate
             Behaviors.same
           else
-            // TODO: Match text to commands
             // TODO: Print a list of known actions
             val actionOpt = input.toLowerCase.split(" ").toList match {
-              case "tap" :: id :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Tap(ref, activePlayer, id))
+              case "tap" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Tap(ref, activePlayer, target.toInt))
               case "draw" :: count :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Draw(ref, activePlayer, count.toInt))
-              case "mulligan" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Mulligan(ref, activePlayer))
-              case "discard" :: count :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, Some(count.toInt)))
+              case "discard" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, None))
+              case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, Some(target.toInt)))
               case _ => println("I don't understand your action"); context.self ! Ready(activePlayer); None
             }
 
             actionOpt.foreach { action =>
               println(s"$input")
-              context.askWithStatus(cardboard, action) {
-                case Success(state: game.InProgressState) => render(state); Ready(state.activePlayer)
-                case Failure(StatusReply.ErrorMessage(text)) => println(text); Ready(activePlayer)
-                case Success(state) => println(s"Wrong state $state"); Terminate
-                case Failure(_) => println("An error occurred"); Ready(activePlayer)
-              }
+              SendAction(context, cardboard, action, {
+                case state: game.InProgressState => render(state); Ready(state.activePlayer)
+                case state => println(s"Wrong state $state"); Terminate
+              })
             }
-
-            // TODO: Render state in cli
 
             Behaviors.same
       }
     }
+
+   def SendAction[Command, State](context: ActorContext[CommandLine.Status],
+                                  target: ActorRef[Command],
+                                  request: ActorRef[StatusReply[State]] => Command,
+                                  onSuccess: State => CommandLine.Status)(implicit responseTimeout: Timeout, classTag: ClassTag[State]): Behavior[CommandLine.Status] = {
+     context.askWithStatus(target, request) {
+       case Success(state) => onSuccess(state)
+       case Failure(StatusReply.ErrorMessage(text)) => println(text); Terminate
+       case Failure(_) => println("An error occurred"); Terminate
+     }
+     Behaviors.same
+  }
 
   def render(state: InProgressState): Unit = {
     println(s"Active Player: ${state.activePlayer}")
     state.players.foreach { case (i, playerState) =>
       println(s"Player: $i - Life: ${playerState.life}")
       println(s"Library: ${playerState.library.length}")
-      println(s"Graveyard: ${playerState.graveyard.toList.length}")
-      println(s"Hand: ${playerState.hand.map(p => s"${p._2.name}").mkString(", ")}")
+      println(s"Graveyard: ${playerState.graveyard.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
+      println(s"Hand: ${playerState.hand.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
       println("\n")
     }
   }

@@ -1,8 +1,15 @@
 package cards
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import game.{InProgressState, State}
+import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
+import game.*
 import monocle.syntax.all.*
+
+case class Deck(cards: List[Card]) {
+
+  private val MIN_DECK_SIZE = 40
+
+  def isValid: Boolean = cards.length >= MIN_DECK_SIZE
+}
 
 enum Color {
   case red, green, black, white, blue
@@ -19,17 +26,27 @@ case class ManaCost() extends Cost
 
 case class Ability(cost: Cost, effect: (InProgressState, String) => InProgressState)
 
-case class Card(
-  name: String,
-  `type`: Type,
-  staticAbilities: List[String],
-  @JsonIgnore activatedAbilities: Map[String, Ability],
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+@JsonSubTypes(
+  Array(
+    new JsonSubTypes.Type(value = classOf[Land], name = "land"),
+  )
 )
+trait Card {
+  val name: String
+  def activatedAbilities: Map[String, Ability]
+}
 
-// TODO: Try Monocle
+case class Land(
+  name: String,
+) extends Card {
+  def activatedAbilities: Map[String, Ability] = {
+    Map(
+      "tap" -> Ability(Tapping, (state, player) => state.focus(_.players.index(player).manaPool.index(Color.red)).modify(_ + 1))
+    )
+  }
+}
+
 // TODO: Should it generate commands/events ?
 // TODO: Should use Pattern Matching
-val forest = Card(
-  "Forest", Type.land, List.empty, Map(
-    "tap" -> Ability(Tapping, (state, player) => state.focus(_.players.index(player).manaPool.index(Color.red)).modify(_ + 1))
-  ))
+val forest = Land("Forest")

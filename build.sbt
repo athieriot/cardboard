@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   ("com.typesafe.akka" %% "akka-persistence-typed" % AkkaVersion).cross(CrossVersion.for3Use2_13),
   ("com.lightbend.akka" %% "akka-persistence-jdbc" % "5.2.0").cross(CrossVersion.for3Use2_13),
   ("com.typesafe.akka" %% "akka-serialization-jackson" % AkkaVersion).cross(CrossVersion.for3Use2_13),
+  "com.github.pjfanning" %% "jackson-module-scala3-enum" % "2.13.3",
   "dev.optics" %% "monocle-core"  % "3.1.0",
   "org.postgresql" % "postgresql" % "42.5.3",
   "ch.qos.logback" % "logback-classic" % "1.4.5"

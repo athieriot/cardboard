@@ -14,27 +14,32 @@ enum Status {
 }
 
 // TODO: Might be called a Spell then
-case class CardInstance(card: Card, owner: String, controller: Int, status: Status, firstTurn: Boolean)
+case class Spell(card: Card, owner: String, controller: Int, status: Status, firstTurn: Boolean)
 
-case class Player(
+type CardId = Int
+
+case class PlayerSide(
   library: List[Card] = List.empty,
   life: Int = 20,
   manaPool: Map[Color, Int] = Map.empty.withDefaultValue(0),
-  hand: Map[Int, Card] = Map.empty,
-  graveyard: Map[Int, Card] = Map.empty,
-  exile: Map[Int, CardInstance] = Map.empty,
+  hand: Map[CardId, Card] = Map.empty,
+  graveyard: Map[CardId, Card] = Map.empty,
+  exile: Map[CardId, Spell] = Map.empty,
   command: Option[Card] = None,
 )
 
 trait State
 case object EmptyState extends State
 
-// TODO: State = Mulligan
+// TODO: Unique ID between zones
+// TODO: State = Number of Mulligan
+// TODO: State = Number of Turns
 case class InProgressState(
   // TODO: Should that be State types ?
   activePlayer: String,
-  players: Map[String, Player],
+  players: Map[String, PlayerSide],
   phase: Option[Phase] = None,
-  stack: List[CardInstance] = List.empty,
-  battleField: Map[Int, CardInstance] = Map.empty,
+  stack: Map[CardId, Spell] = Map.empty,
+  battleField: Map[CardId, Spell] = Map.empty,
+  highestId: CardId = 1,
 ) extends State
