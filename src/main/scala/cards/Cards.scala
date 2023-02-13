@@ -1,10 +1,15 @@
 package cards
 
-import game.State
-import monocle.syntax.all._
+import com.fasterxml.jackson.annotation.JsonIgnore
+import game.{InProgressState, State}
+import monocle.syntax.all.*
 
 enum Color {
   case red, green, black, white, blue
+}
+
+enum Type {
+  case land
 }
 
 trait Cost
@@ -12,18 +17,19 @@ trait Cost
 case object Tapping extends Cost
 case class ManaCost() extends Cost
 
-case class Ability(cost: Cost, effect: (State, String) => State)
+case class Ability(cost: Cost, effect: (InProgressState, String) => InProgressState)
 
-trait Card {
-  val name: String
-  val activatedAbilities: Map[String, Ability]
-}
-case class Land(name: String, staticAbilities: List[String], activatedAbilities: Map[String, Ability]) extends Card
+case class Card(
+  name: String,
+  `type`: Type,
+  staticAbilities: List[String],
+  @JsonIgnore activatedAbilities: Map[String, Ability],
+)
 
 // TODO: Try Monocle
 // TODO: Should it generate commands/events ?
 // TODO: Should use Pattern Matching
-val forest = Land(
-  "Forest", List.empty, Map(
-    "tap" -> Ability(Tapping, (state, player) => state.focus(_.playerStates.index(player).manaPool.index(Color.red)).modify(_ + 1))
+val forest = Card(
+  "Forest", Type.land, List.empty, Map(
+    "tap" -> Ability(Tapping, (state, player) => state.focus(_.players.index(player).manaPool.index(Color.red)).modify(_ + 1))
   ))

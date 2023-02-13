@@ -16,7 +16,7 @@ enum Status {
 // TODO: Might be called a Spell then
 case class CardInstance(card: Card, owner: String, controller: Int, status: Status, firstTurn: Boolean)
 
-case class PlayerState(
+case class Player(
   library: List[Card] = List.empty,
   life: Int = 20,
   manaPool: Map[Color, Int] = Map.empty.withDefaultValue(0),
@@ -26,24 +26,15 @@ case class PlayerState(
   command: Option[Card] = None,
 )
 
+trait State
+case object EmptyState extends State
+
 // TODO: State = Mulligan
-case class State(
-  id: UUID,
+case class InProgressState(
   // TODO: Should that be State types ?
   activePlayer: String,
-  playerStates: Map[String, PlayerState],
+  players: Map[String, Player],
   phase: Option[Phase] = None,
   stack: List[CardInstance] = List.empty,
   battleField: Map[Int, CardInstance] = Map.empty,
-) {
-  def render(state: State): Unit = {
-    println(s"Game id: ${state.id}")
-    println(s"Active Player: ${state.activePlayer}")
-    playerStates.foreach { case (i, playerState) =>
-      println(s"P$i - Life: ${playerState.life}")
-      println(s"Library: ${playerState.library.length}")
-      println(s"Hand: ${playerState.hand.map(p => s"${p._2.name}").mkString(", ")}")
-      println("\n")
-    }
-  }
-}
+) extends State

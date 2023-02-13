@@ -7,12 +7,11 @@ import java.util.UUID
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
-@main def init(): Unit = {
-  val instance = game.Engine(
-    UUID.randomUUID(),
-    Map("Jack" -> List(forest), "Jill" -> List(forest))
-  )
-  val system = ActorSystem(CommandLine(instance), "command-line")
+@main def init(args: String*): Unit = {
+  val id = args.headOption.map(UUID.fromString).getOrElse(UUID.randomUUID())
+  val system = ActorSystem(CommandLine(game.Engine(id)), "command-line")
+
+  println(s"Initiate Game: $id")
 
   system ! CommandLine.Initiate
 
