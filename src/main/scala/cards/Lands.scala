@@ -31,5 +31,6 @@ val mountain = BasicLand("Mountain", Color.red)
 val swamp = BasicLand("Swamp", Color.black)
 val plains = BasicLand("Plains", Color.white)
 val island = BasicLand("Island", Color.blue)
+val wastes = BasicLand("Wastes", Color.none)
 
 val basicLands = List(forest, mountain, swamp, plains, island)

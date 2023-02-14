@@ -11,7 +11,7 @@ sealed trait Action {
 final case class Recover(replyTo: ActorRef[StatusReply[State]]) extends Action
 final case class New(replyTo: ActorRef[StatusReply[State]], players: Map[String, Deck]) extends Action
 
-final case class Ready(replyTo: ActorRef[StatusReply[State]]) extends Action
+final case class Play(replyTo: ActorRef[StatusReply[State]],  player: String, target: CardId) extends Action
 
 final case class Draw(replyTo: ActorRef[StatusReply[State]], player: String, count: Int) extends Action
 final case class Discard(replyTo: ActorRef[StatusReply[State]], player: String, target: Option[CardId]) extends Action

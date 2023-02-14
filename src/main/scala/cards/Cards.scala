@@ -12,7 +12,7 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 }
 
 enum Color {
-  case red, green, black, white, blue
+  case red, green, black, white, blue, none
 }
 
 enum Type {
