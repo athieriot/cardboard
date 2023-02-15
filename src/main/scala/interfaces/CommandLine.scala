@@ -6,6 +6,9 @@ import akka.pattern.StatusReply
 import akka.util.Timeout
 import cards.*
 import game.*
+import org.jline.reader.LineReaderBuilder
+import org.jline.reader.impl.completer.{EnumCompleter, StringsCompleter}
+import org.jline.terminal.TerminalBuilder
 
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
@@ -24,6 +27,11 @@ object CommandLine {
     Behaviors.setup[CommandLine.Status] { context =>
       implicit val timeout: Timeout = 3.seconds
 
+      val lineReader = LineReaderBuilder.builder()
+        .terminal(TerminalBuilder.terminal)
+        .completer(new StringsCompleter("play", "use", "pass", "discard", "exit"))
+        .build()
+
       val cardboard = context.spawn(instance, "game")
 
       Behaviors.receiveMessage[CommandLine.Status] {
@@ -36,10 +44,8 @@ object CommandLine {
           })
 
         case Prepare =>
-          print("Player One: ");
-          val playerOne = scala.io.StdIn.readLine()
-          print("Player Two: ");
-          val playerTwo = scala.io.StdIn.readLine()
+          val playerOne = lineReader.readLine("Player One: ")
+          val playerTwo = lineReader.readLine("Player Two: ")
 
           val players = Map(
             playerOne -> standardDeck,
@@ -52,14 +58,12 @@ object CommandLine {
           })
 
         case Ready(activePlayer) =>
-          print(s"|$activePlayer|> ")
-          val input = scala.io.StdIn.readLine()
+          val input = lineReader.readLine(s"|$activePlayer|> ")
 
-          if input == "!!!" then
+          if input == "exit" then
             context.self ! Terminate
             Behaviors.same
           else
-            // TODO: Print a list of known actions
             // TODO: Jline ?
             val actionOpt = input.toLowerCase.split(" ").toList match {
               case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, target.toInt))

@@ -53,6 +53,7 @@ object Engine {
             }
           }
 
+          // TODO: Pass turn would be cool
           // TODO: Should we add events or persist first ?
           // TODO: Check conditions for End step, like hand size ?
           case Pass(replyTo, player) => checkPriority(replyTo, state, player) {
@@ -113,7 +114,11 @@ object Engine {
             val nextPlayer = state.players.keys.sliding(2).find(_.head == state.playersTurn).map(_.last).getOrElse(state.players.keys.head)
             // TODO: Priority should be anoter Event
             state.focus(_.playersTurn).replace(nextPlayer).focus(_.priority).replace(nextPlayer)
-            
+
+          case CleanTurnState => state.players.keys.foldLeft(state) { (state, player) =>
+            state.focus(_.players.index(player).turn).replace(TurnState())
+          }
+
           case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, 0)))
           }

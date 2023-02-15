@@ -34,6 +34,7 @@ final case class Moved(phase: Phase) extends StateBaseEvent
 case object PlayerSwap extends StateBaseEvent
 case object ManaPoolEmptied extends StateBaseEvent
 case object Untapped extends StateBaseEvent
+case object CleanTurnState extends StateBaseEvent
 
 final case class LandPlayed(target: CardId, player: PlayerId) extends Event
 final case class ManaAdded(mana: Map[Color, Int], player: PlayerId) extends Event

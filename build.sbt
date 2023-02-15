@@ -12,7 +12,8 @@ libraryDependencies ++= Seq(
   "com.github.pjfanning" %% "jackson-module-scala3-enum" % "2.13.3",
   "dev.optics" %% "monocle-core"  % "3.1.0",
   "org.postgresql" % "postgresql" % "42.5.3",
-  "ch.qos.logback" % "logback-classic" % "1.4.5"
+  "ch.qos.logback" % "logback-classic" % "1.4.5",
+  "org.jline" % "jline" % "3.22.0",
 )
 
 lazy val root = (project in file("."))
