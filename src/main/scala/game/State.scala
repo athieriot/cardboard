@@ -7,6 +7,10 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.util.{Failure, Try}
 
+type CardId = Int
+// TODO: Propagate
+type PlayerId = String
+
 enum Status {
   case Tapped, Untapped
 }
@@ -19,10 +23,6 @@ case class Instance(
   status: Status = Untapped,
   firstTurn: Boolean = true
 )
-
-type CardId = Int
-// TODO: Propagate
-type PlayerId = String
 
 case class PlayerState(
   library: List[Card] = List.empty,

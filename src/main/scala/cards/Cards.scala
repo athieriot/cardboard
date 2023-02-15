@@ -18,23 +18,19 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 }
 
 trait Cost {
-  def canPay(target: Instance): Boolean
+  def check(target: Instance): Boolean
   def pay(target: CardId, player: PlayerId): List[Event]
 }
 case object Tap extends Cost {
-  def canPay(target: Instance): Boolean = target.status == Status.Untapped
+  def check(target: Instance): Boolean = target.status == Status.Untapped
   def pay(target: CardId, player: PlayerId): List[Event] = List(Tapped(target))
 }
 case class ManaCost(text: String) extends Cost {
-  def canPay(target: Instance): Boolean = ???
+  def check(target: Instance): Boolean = ???
   def pay(target: CardId, player: PlayerId): List[Event] = ???
 }
 
-
 case class Ability(cost: Cost, effect: (InProgressState, String) => List[Event])
-
-
-
 
 enum Type {
   case artifact, creature, enchantment, instant, land, planesWalker, sorcery

@@ -51,19 +51,13 @@ object Engine {
             Effect.persist(Moved(state.phase.next()) +: state.phase.next().turnBasedActions(player))
               .thenReply(replyTo)(state => StatusReply.Success(state))
 
-          case Discard(replyTo, player, target) =>
-            if state.players(player).hand.contains(target) then
-              Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
-            else
-              Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
-
           // TODO: Have command Read
           case Use(replyTo, player, target, abilityId) => // Target Wrapper // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
               case Some(instance) =>
                 instance.card.activatedAbilities.get(abilityId) match {
                   case Some(ability) =>
-                    if ability.cost.canPay(instance) then
+                    if ability.cost.check(instance) then
                       Effect.persist(ability.cost.pay(target, player) ++ ability.effect(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
                     else
                       Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
@@ -71,6 +65,12 @@ object Engine {
                 }
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
+
+          case Discard(replyTo, player, target) =>
+            if state.players(player).hand.contains(target) then
+              Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+            else
+              Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
 
           case _ => Effect.noReply
 
