@@ -1,14 +1,17 @@
 package cards
 
-import game.{Event, ManaPoolEmptied}
+import game.*
 
 enum Phase {
   def next(): Phase = Phase.values.sliding(2).find(_.head == this).map(_.last).getOrElse(unTap)
   
   // TODO: Implement more Turn Based actions
-  def turnBasedActions(): List[Event] = List(ManaPoolEmptied)
+  def turnBasedActions(player: PlayerId): List[Event] = List(ManaPoolEmptied) ++ { this match {
+    case Phase.draw => List(Drawn(1, player))
+    case _ => List()
+  }}
   
-  def isMain = this == preCombatMain || this == postCombatMain
+  def isMain: Boolean = this == preCombatMain || this == postCombatMain
 
   case unTap, upKeep, draw, preCombatMain, beginningOfCombat, declareAttackers, declareBlockers, combatDamage, endOfCombat, postCombatMain, end, cleanup
 }

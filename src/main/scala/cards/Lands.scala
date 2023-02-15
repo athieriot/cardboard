@@ -2,7 +2,10 @@ package cards
 
 import cards.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
+import game.*
 import monocle.syntax.all.*
+
+import java.net.URL
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
@@ -14,23 +17,23 @@ trait LandType extends Card
 
 case class BasicLand(
   name: String,
-  colorProduced: Color
+  subTypes: List[String],
+  colorProduced: Color,
+  preview: URL,
+  color: Color = Color.none,
+  manaCost: Option[ManaCost] = Some(ManaCost("0"))
 ) extends LandType {
-  def activatedAbilities: Map[String, Ability] = {
-    Map(
-      "tap" -> Ability(Tapping, (state, player) => state.focus(_.players.index(player).manaPool.index(colorProduced)).modify(_ + 1))
-    )
-  }
+  def activatedAbilities: Map[Int, Ability] = Map(
+    1 -> Ability(Tap, (_, player) => List(ManaAdded(Map(colorProduced -> 1), player)))
+  )
 }
 
-// TODO: Should it generate commands/events ?
 // TODO: Should use Pattern Matching
-// TODO: Card names in color ?
-val forest = BasicLand("Forest", Color.green)
-val mountain = BasicLand("Mountain", Color.red)
-val swamp = BasicLand("Swamp", Color.black)
-val plains = BasicLand("Plains", Color.white)
-val island = BasicLand("Island", Color.blue)
-val wastes = BasicLand("Wastes", Color.none)
+val forest = BasicLand("Forest", List("Basic Land", "Forest"), Color.green, new URL("https://scryfall.com/card/one/276/forest"))
+val mountain = BasicLand("Mountain", List("Basic Land", "Mountain"), Color.red, new URL("https://scryfall.com/card/one/275/mountain"))
+val swamp = BasicLand("Swamp", List("Basic Land", "Swamp"), Color.black, new URL("https://scryfall.com/card/one/274/swamp"))
+val plains = BasicLand("Plains", List("Basic Land", "Plains"), Color.white, new URL("https://scryfall.com/card/one/272/plains"))
+val island = BasicLand("Island", List("Basic Land", "Island"), Color.blue, new URL("https://scryfall.com/card/one/273/island"))
+val wastes = BasicLand("Wastes", List("Basic Land", "Wastes"), Color.none, new URL("https://scryfall.com/card/ogw/183a/wastes"))
 
-val basicLands = List(forest, mountain, swamp, plains, island)
+val basicLands = List(forest, mountain, swamp, plains, island, wastes)

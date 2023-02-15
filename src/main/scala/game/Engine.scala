@@ -9,7 +9,7 @@ import game.*
 import monocle.syntax.all.*
 
 import java.util.UUID
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 object Engine {
 
@@ -27,7 +27,6 @@ object Engine {
             else
               def randomOrder(n: Int) = scala.util.Random.shuffle(1 to n*2).toList
 
-              // TODO: How to orchestrate multiple effects and triggers !??
               Effect.persist(
                 List(Created(scala.util.Random.nextInt(players.size), players))
                   ++ players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }
@@ -47,8 +46,9 @@ object Engine {
             }
 
           // TODO: Should we add events or persist first ?
-          case Pass(replyTo, _) =>
-            Effect.persist(Moved(state.phase.next()) +: state.phase.next().turnBasedActions())
+          // TODO: Check conditions for End step, like hand size ?
+          case Pass(replyTo, player) =>
+            Effect.persist(Moved(state.phase.next()) +: state.phase.next().turnBasedActions(player))
               .thenReply(replyTo)(state => StatusReply.Success(state))
 
           case Discard(replyTo, player, target) =>
@@ -56,15 +56,22 @@ object Engine {
               Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
             else
               Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
-              
-          // TODO: Tap should be "Use" instead and target an ability with a cost
-          // TODO: Check for current tapStatus
-          // TODO: Check for Cost
-          case Tap(replyTo, player, target) =>
+
+          // TODO: Have command Read
+          case Use(replyTo, player, target, abilityId) => // Target Wrapper // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
-              case Some(_) => Effect.persist(Tapped(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"No target found"))
+              case Some(instance) =>
+                instance.card.activatedAbilities.get(abilityId) match {
+                  case Some(ability) =>
+                    if ability.cost.canPay(instance) then
+                      Effect.persist(ability.cost.pay(target, player) ++ ability.effect(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                    else
+                      Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
+                  case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Abilities not found"))
+                }
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
+
           case _ => Effect.noReply
 
           // TODO: When pass priority, check state based actions
@@ -78,10 +85,12 @@ object Engine {
       case EmptyState =>
         event match {
           case Created(die: Int, players: Map[String, Deck]) =>
+            val startingUser = players.keys.toIndexedSeq(die)
+
             InProgressState(
-              players.keys.toIndexedSeq(die),
-              players.keys.toIndexedSeq(die),
-              players.map((name, deck) => (name, PlayerSide(deck.cards)))
+              startingUser,
+              startingUser,
+              players.map((name, deck) => (name, PlayerState(deck.cards)))
             )
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }
@@ -92,6 +101,8 @@ object Engine {
           case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, 0)))
           }
+          case ManaAdded(mana, player) =>
+            state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, p._2 + mana.getOrElse(p._1, 0))))
 
           case Shuffled(order, player) =>
             val shuffled = order.zip(state.players(player).library).sortBy(_._1).map(_._2)
@@ -113,13 +124,11 @@ object Engine {
             if state.players(player).hand.contains(target) then
               state.focus (_.players.index (player).graveyard).modify (_ + (target -> state.players (player).hand (target) ) )
                 .focus (_.players.index (player).hand).modify (_.removed (target) )
-            else 
+            else
               state
 
-          case Tapped(target, player) =>
-            // TODO: Tap should trigger events instead
-            state.battleField(target).card.activatedAbilities("tap").effect(state, player)
-              .focus(_.battleField.index(target).status).replace(Status.Tapped)
+          case Tapped(target) =>
+            state.focus(_.battleField.index(target).status).replace(Status.Tapped)
 
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }

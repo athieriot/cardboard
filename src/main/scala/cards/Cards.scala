@@ -4,6 +4,12 @@ import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 import monocle.syntax.all.*
 
+import java.net.URL
+
+enum Color {
+  case red, green, black, white, blue, none
+}
+
 case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 
   private val MIN_DECK_SIZE = 40
@@ -11,20 +17,28 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
   def isValid: Boolean = cards.length >= MIN_DECK_SIZE
 }
 
-enum Color {
-  case red, green, black, white, blue, none
+trait Cost {
+  def canPay(target: Instance): Boolean
+  def pay(target: CardId, player: PlayerId): List[Event]
 }
+case object Tap extends Cost {
+  def canPay(target: Instance): Boolean = target.status == Status.Untapped
+  def pay(target: CardId, player: PlayerId): List[Event] = List(Tapped(target))
+}
+case class ManaCost(text: String) extends Cost {
+  def canPay(target: Instance): Boolean = ???
+  def pay(target: CardId, player: PlayerId): List[Event] = ???
+}
+
+
+case class Ability(cost: Cost, effect: (InProgressState, String) => List[Event])
+
+
+
 
 enum Type {
-  case artifact, creature, enchantment, instant, land, planeswalker, sorcery
+  case artifact, creature, enchantment, instant, land, planesWalker, sorcery
 }
-
-trait Cost
-
-case object Tapping extends Cost
-case class ManaCost() extends Cost
-
-case class Ability(cost: Cost, effect: (InProgressState, String) => InProgressState)
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
@@ -34,7 +48,11 @@ case class Ability(cost: Cost, effect: (InProgressState, String) => InProgressSt
 )
 trait Card {
   val name: String
-  def activatedAbilities: Map[String, Ability]
+  val subTypes: List[String]
+  val color: Color
+  val manaCost: Option[ManaCost]
+  val preview: URL
+  def activatedAbilities: Map[Int, Ability]
 }
 
 val standardDeck: Deck = Deck((1 to 8).flatMap(_ => basicLands).toList)

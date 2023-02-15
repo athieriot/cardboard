@@ -21,12 +21,13 @@ case class Instance(
 )
 
 type CardId = Int
+// TODO: Propagate
+type PlayerId = String
 
-case class PlayerSide(
+case class PlayerState(
   library: List[Card] = List.empty,
   life: Int = 20,
   turn: TurnState = TurnState(),
-  // TODO: Mana pool is lost by phase, not turn
   manaPool: Map[Color, Int] = Color.values.map((_, 0)).toMap,
   hand: Map[CardId, Card] = Map.empty,
   graveyard: Map[CardId, Card] = Map.empty,
@@ -34,6 +35,7 @@ case class PlayerSide(
   command: Option[Card] = None,
 )
 
+// TODO: Put here cost when it's an interaction ? Like discard
 case class TurnState(
   landsToPlay: Int = 1,
 )
@@ -47,14 +49,14 @@ case class InProgressState(
   // TODO: Should that be State types ?
   playersTurn: String,
   priority: String,
-  players: Map[String, PlayerSide],
+  players: Map[String, PlayerState],
   phase: Phase = Phase.preCombatMain,
   stack: Map[CardId, Instance] = Map.empty,
   battleField: Map[CardId, Instance] = Map.empty,
   highestId: CardId = 1,
 ) extends State {
 
-  def landPlayCheck(player: String, target: CardId): Try[Unit] = Try {
+  def landPlayCheck(player: PlayerId, target: CardId): Try[Unit] = Try {
     if !this.players(player).hand.get(target).exists(_.isInstanceOf[LandType]) then
       throw new RuntimeException("Target is not a Land")
     else if this.playersTurn != player then

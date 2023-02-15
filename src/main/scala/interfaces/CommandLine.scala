@@ -17,7 +17,7 @@ object CommandLine {
 
   case object Initiate extends Status
   case object Prepare extends Status
-  case class Ready(activePlayer: String) extends Status
+  case class Ready(activePlayer: PlayerId) extends Status
   case object Terminate extends Status
 
   def apply(instance: Behavior[Action]): Behavior[Status] =
@@ -62,8 +62,8 @@ object CommandLine {
             // TODO: Print a list of known actions
             // TODO: Jline ?
             val actionOpt = input.toLowerCase.split(" ").toList match {
-              case "tap" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Tap(ref, activePlayer, target.toInt))
               case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, target.toInt))
+              case "use" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Use(ref, activePlayer, target.toInt, abilityId.toInt))
               case "pass" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer))
               case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, target.toInt))
               case _ => println("I don't understand your action"); context.self ! Ready(activePlayer); None
@@ -99,6 +99,7 @@ object CommandLine {
   }
 
   // TODO: Add links to Scryfall
+  // TODO: Card names in color ?
   private def render(state: InProgressState): Unit = {
     println("\n")
     val playerOne = state.players.head
@@ -118,7 +119,7 @@ object CommandLine {
     println("\n")
   }
 
-  private def renderPlayer(state: InProgressState, name: String, playerState: PlayerSide): Unit = {
+  private def renderPlayer(state: InProgressState, name: String, playerState: PlayerState): Unit = {
     val active = if state.playersTurn == name then "⭐ " else ""
     val priority = if state.priority == name then " 🟢" else ""
 
