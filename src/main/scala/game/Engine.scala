@@ -109,7 +109,11 @@ object Engine {
       case state: InProgressState =>
         event match {
           case Moved(phase) => state.focus(_.phase).replace(phase)
-          case PlayerSwap => state.focus(_.playersTurn).replace(state.players.keys.sliding(2).find(_.head == state.playersTurn).map(_.last).getOrElse(state.players.keys.head))
+          case PlayerSwap =>
+            val nextPlayer = state.players.keys.sliding(2).find(_.head == state.playersTurn).map(_.last).getOrElse(state.players.keys.head)
+            // TODO: Priority should be anoter Event
+            state.focus(_.playersTurn).replace(nextPlayer).focus(_.priority).replace(nextPlayer)
+            
           case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, 0)))
           }

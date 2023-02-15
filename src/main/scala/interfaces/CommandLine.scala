@@ -108,9 +108,9 @@ object CommandLine {
 
     // TODO: Display summoning sickness
     // TODO: Show each types (Creatures, Artefacts, Enchantments, Planeswalkers) on a different line
-    println(s"🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${p._2.card.name}[${p._1}][${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
     println("|------------------")
-    println(s"🌳Lands: ${state.battleField.filter(_._2.owner == playerTwo._1).map(p => s"${p._2.card.name}[${p._1}][${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"🌳Lands: ${state.battleField.filter(_._2.owner == playerTwo._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
 
     renderPlayer(state, playerTwo._1, playerTwo._2)
 
@@ -126,18 +126,20 @@ object CommandLine {
     println("|------------------")
     println(s"| Player: $active$name$priority - Life: ${playerState.life}")
     println(s"| 📚Library: ${playerState.library.size}")
-    println(s"| 🪦Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
-    println(s"| ✋ Hand (${playerState.hand.size}): ${playerState.hand.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
-    println(s"| 🪄Mana: ${playerState.manaPool.map(m => s"${terminalColor(m._1)}${m._1} (${m._2})${Console.RESET}").mkString(" / ")}")
+    println(s"| 🪦Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| ✋ Hand (${playerState.hand.size}): ${playerState.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| 🪄Mana: ${playerState.manaPool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")
     println("|------------------")
   }
 
-  private def terminalColor(c: Color): String = c match {
-    case Color.red => Console.RED
-    case Color.green => Console.GREEN
-    case Color.white => Console.WHITE
-    case Color.black => Console.BLACK
-    case Color.blue => Console.BLUE
-    case Color.none => Console.YELLOW
+  def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
+
+  private def terminalColor(c: Color, text: String): String = c match {
+    case Color.red => s"${Console.RED}$text${Console.RESET}"
+    case Color.green => s"${Console.GREEN}$text${Console.RESET}"
+    case Color.white => s"${Console.WHITE}$text${Console.RESET}"
+    case Color.black => s"${Console.BLACK}$text${Console.RESET}"
+    case Color.blue => s"${Console.BLUE}$text${Console.RESET}"
+    case Color.none => s"${Console.YELLOW}$text${Console.RESET}"
   }
 }

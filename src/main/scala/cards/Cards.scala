@@ -40,6 +40,7 @@ enum Type {
 @JsonSubTypes(
   Array(
     new JsonSubTypes.Type(value = classOf[LandType], name = "landType"),
+    new JsonSubTypes.Type(value = classOf[Creature], name = "creature"),
   )
 )
 trait Card {
@@ -51,4 +52,4 @@ trait Card {
   def activatedAbilities: Map[Int, Ability]
 }
 
-val standardDeck: Deck = Deck((1 to 8).flatMap(_ => basicLands).toList)
+val standardDeck: Deck = Deck((1 to 10).flatMap(_ => basicLands).toList ++ (1 to 10).map(_ => llanowarElf))

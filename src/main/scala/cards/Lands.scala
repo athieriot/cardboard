@@ -37,4 +37,4 @@ val plains = BasicLand("Plains", List("Basic Land", "Plains"), Color.white, new 
 val island = BasicLand("Island", List("Basic Land", "Island"), Color.blue, new URL("https://scryfall.com/card/one/273/island"))
 val wastes = BasicLand("Wastes", List("Basic Land", "Wastes"), Color.none, new URL("https://scryfall.com/card/ogw/183a/wastes"))
 
-val basicLands = List(forest, mountain, swamp, plains, island, wastes)
+val basicLands = List(forest, mountain, swamp, plains, island)
