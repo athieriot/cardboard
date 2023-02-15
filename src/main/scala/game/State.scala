@@ -22,7 +22,11 @@ case class Instance(
   controller: String,
   status: Status = Untapped,
   firstTurn: Boolean = true
-)
+) {
+  def unTap: Instance = {
+    this.copy(status = Status.Untapped)
+  }
+}
 
 case class PlayerState(
   library: List[Card] = List.empty,
@@ -35,7 +39,7 @@ case class PlayerState(
   command: Option[Card] = None,
 )
 
-// TODO: Put here cost when it's an interaction ? Like discard
+// TODO: Put here cost when it's an interaction required ? Like discard
 case class TurnState(
   landsToPlay: Int = 1,
 )
@@ -56,6 +60,7 @@ case class InProgressState(
   highestId: CardId = 1,
 ) extends State {
 
+  // TODO: I feel like this should go in the LandType class
   def landPlayCheck(player: PlayerId, target: CardId): Try[Unit] = Try {
     if !this.players(player).hand.get(target).exists(_.isInstanceOf[LandType]) then
       throw new RuntimeException("Target is not a Land")

@@ -6,6 +6,7 @@ import game.*
 import monocle.syntax.all.*
 
 import java.net.URL
+import scala.util.Try
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(

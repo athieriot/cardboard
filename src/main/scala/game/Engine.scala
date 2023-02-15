@@ -1,6 +1,6 @@
 package game
 
-import akka.actor.typed.Behavior
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
@@ -14,6 +14,13 @@ import scala.util.{Failure, Success, Try}
 object Engine {
 
   private val OPENING_HAND = 7
+
+  // Should there be a context object ?
+  private def checkPriority(replyTo: ActorRef[StatusReply[State]], state: InProgressState, player: PlayerId)(block: => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
+    if state.priority == player then
+      block
+    else
+      Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"$player does not have priority"))
 
   // TODO: Check if player is allowed to play (Wrapper)
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
@@ -39,20 +46,22 @@ object Engine {
         command match {
           case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
 
-          case PlayLand(replyTo, player, target) =>
+          case PlayLand(replyTo, player, target) => checkPriority(replyTo, state, player) {
             state.landPlayCheck(player, target) match {
               case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
               case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
             }
+          }
 
           // TODO: Should we add events or persist first ?
           // TODO: Check conditions for End step, like hand size ?
-          case Pass(replyTo, player) =>
+          case Pass(replyTo, player) => checkPriority(replyTo, state, player) {
             Effect.persist(Moved(state.phase.next()) +: state.phase.next().turnBasedActions(player))
               .thenReply(replyTo)(state => StatusReply.Success(state))
+          }
 
-          // TODO: Have command Read
-          case Use(replyTo, player, target, abilityId) => // Target Wrapper // Player Wrapper
+          // TODO: Have a command to Read the text and abilities
+          case Use(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
               case Some(instance) =>
                 instance.card.activatedAbilities.get(abilityId) match {
@@ -65,12 +74,14 @@ object Engine {
                 }
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
+          }
 
-          case Discard(replyTo, player, target) =>
+          case Discard(replyTo, player, target) => checkPriority(replyTo, state, player) {
             if state.players(player).hand.contains(target) then
               Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
             else
               Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+          }
 
           case _ => Effect.noReply
 
@@ -98,6 +109,7 @@ object Engine {
       case state: InProgressState =>
         event match {
           case Moved(phase) => state.focus(_.phase).replace(phase)
+          case PlayerSwap => state.focus(_.playersTurn).replace(state.players.keys.sliding(2).find(_.head == state.playersTurn).map(_.last).getOrElse(state.players.keys.head))
           case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, 0)))
           }
@@ -122,13 +134,15 @@ object Engine {
 
           case Discarded(target, player) =>
             if state.players(player).hand.contains(target) then
-              state.focus (_.players.index (player).graveyard).modify (_ + (target -> state.players (player).hand (target) ) )
-                .focus (_.players.index (player).hand).modify (_.removed (target) )
+              state.focus(_.players.index(player).graveyard).modify(_ + (target -> state.players (player).hand(target)))
+                .focus(_.players.index (player).hand).modify(_.removed (target))
             else
               state
 
           case Tapped(target) =>
             state.focus(_.battleField.index(target).status).replace(Status.Tapped)
+          case Untapped =>
+            state.focus(_.battleField).modify(_.map(p => (p._1, p._2.unTap)))
 
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }
