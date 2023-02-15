@@ -5,6 +5,7 @@ import game.Status.Untapped
 
 import java.util.UUID
 import scala.collection.mutable
+import scala.util.{Failure, Try}
 
 enum Status {
   case Tapped, Untapped
@@ -52,6 +53,15 @@ case class InProgressState(
   battleField: Map[CardId, Instance] = Map.empty,
   highestId: CardId = 1,
 ) extends State {
-  
-//  def canPlayALand
+
+  def landPlayCheck(player: String, target: CardId): Try[Unit] = Try {
+    if !this.players(player).hand.get(target).exists(_.isInstanceOf[LandType]) then
+      throw new RuntimeException("Target is not a Land")
+    else if this.playersTurn != player then
+      throw new RuntimeException("You can only play lands during your turn")
+    else if !this.phase.isMain then
+      throw new RuntimeException("You can only play lands during a main phase")
+    else if this.players(player).turn.landsToPlay <= 0 then
+      throw new RuntimeException("You already played a land this turn")
+  }
 }

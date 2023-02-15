@@ -1,7 +1,7 @@
 package game
 
 import akka.actor.typed.Behavior
-import akka.pattern.StatusReply.{Success, Error}
+import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import cards.*
@@ -9,6 +9,7 @@ import game.*
 import monocle.syntax.all.*
 
 import java.util.UUID
+import scala.util.{Failure, Success}
 
 object Engine {
 
@@ -19,55 +20,55 @@ object Engine {
     state match {
       case EmptyState =>
         command match {
-          case Recover(replyTo) => Effect.none.thenReply(replyTo)(Success(_))
+          case Recover(replyTo) => Effect.none.thenReply(replyTo)(StatusReply.Success(_))
           case New(replyTo, players: Map[String, Deck]) =>
             if players.exists(!_._2.isValid) then
-              Effect.none.thenReply(replyTo)(_ => Error(s"Deck invalid"))
+              Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Deck invalid"))
             else
               def randomOrder(n: Int) = scala.util.Random.shuffle(1 to n*2).toList
 
               // TODO: How to orchestrate multiple effects and triggers !??
               Effect.persist(
-                Seq(Created(scala.util.Random.nextInt(players.size), players))
-                  ++ (players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }.toSeq
-                  ++ players.keys.map(Drawn(OPENING_HAND, _)).toSeq)
-              ).thenReply(replyTo)(state => Success(state))
+                List(Created(scala.util.Random.nextInt(players.size), players))
+                  ++ players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }
+                  ++ players.keys.map(Drawn(OPENING_HAND, _))
+              ).thenReply(replyTo)(state => StatusReply.Success(state))
           case _ => Effect.noReply
         }
 
       case state: InProgressState =>
         command match {
-          case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => Success(state))
-          case Play(replyTo, player, target) =>
-            // TODO: Extract those checks in methods
-            // TODO: Need to check it's player's turn
-            if state.players(player).turn.landsToPlay > 0
-                && state.players(player).hand.get(target).exists(_.isInstanceOf[LandType])
-                && (state.phase == Phase.preCombatMain || state.phase == Phase.postCombatMain) then
-              Effect.persist(Played(target, player)).thenReply(replyTo)(state => Success(state))
-            else
-              Effect.none.thenReply(replyTo)(_ => Error(s"$target is not a land, you played a land this turn, it's not a main phase"))
+          case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
 
-          // TODO: Check Draw Phase
-          case Draw(replyTo, player, count) =>
-            state.players(player).library match {
-              // TODO: Should loose then, but only in the event handler as loosing a world check ?
-              case _ :: _ => Effect.persist(Drawn(count, player)).thenReply(replyTo)(state => Success(state))
-              case Nil => Effect.none.thenReply(replyTo)(_ => Error(s"No more cards in the Library"))
+          case PlayLand(replyTo, player, target) =>
+            state.landPlayCheck(player, target) match {
+              case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+              case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
             }
 
-          case Discard(replyTo, player, target) =>
-            // TODO: Check if in hand ?
-            Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => Success(state))
+          // TODO: Should we add events or persist first ?
+          case Pass(replyTo, _) =>
+            Effect.persist(Moved(state.phase.next()) +: state.phase.next().turnBasedActions())
+              .thenReply(replyTo)(state => StatusReply.Success(state))
 
+          case Discard(replyTo, player, target) =>
+            if state.players(player).hand.contains(target) then
+              Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+            else
+              Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+              
+          // TODO: Tap should be "Use" instead and target an ability with a cost
           // TODO: Check for current tapStatus
           // TODO: Check for Cost
           case Tap(replyTo, player, target) =>
             state.battleField.filter(_._2.owner == player).get(target) match {
-              case Some(_) => Effect.persist(Tapped(target, player)).thenReply(replyTo)(state => Success(state))
-              case None => Effect.none.thenReply(replyTo)(_ => Error(s"No target found"))
+              case Some(_) => Effect.persist(Tapped(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"No target found"))
             }
           case _ => Effect.noReply
+
+          // TODO: When pass priority, check state based actions
+          // TODO: Implement priority/Mulligan
         }
     }
   }
@@ -88,32 +89,32 @@ object Engine {
       case state: InProgressState =>
         event match {
           case Moved(phase) => state.focus(_.phase).replace(phase)
+          case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
+            state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, 0)))
+          }
+
           case Shuffled(order, player) =>
             val shuffled = order.zip(state.players(player).library).sortBy(_._1).map(_._2)
             state.focus(_.players.index(player).library).replace(shuffled)
 
-          case Played(target, player) =>
+          case LandPlayed(target, player) =>
             val instance = Instance(state.players(player).hand(target), player, player)
             state.focus(_.battleField).modify(_ + (target -> instance))
               .focus(_.players.index(player).hand).modify(_.removed(target))
               .focus(_.players.index(player).turn.landsToPlay).modify(_ - 1)
 
-          // TODO: Should we draw first ?
-          case Drawn(count, player) =>
-            state.focus(_.players.index(player).hand).modify(_ ++ state.players(player).library.take(count).zipWithIndex.map { case (card, i) => state.highestId + i -> card })
-              .focus(_.players.index(player).library).modify(_.drop(count))
-              .focus(_.highestId).modify(_ + count)
+          // TODO: Extract some of those focus
+          case Drawn(amount, player) =>
+            state.focus(_.players.index(player).hand).modify(_ ++ state.players(player).library.take(amount).zipWithIndex.map { case (card, i) => state.highestId + i -> card })
+              .focus(_.players.index(player).library).modify(_.drop(amount))
+              .focus(_.highestId).modify(_ + amount)
 
           case Discarded(target, player) =>
-            target match {
-              case None =>
-                state.focus(_.players.index(player).graveyard).modify(_ ++ state.players(player).hand)
-                  .focus(_.players.index(player).hand).replace(Map.empty)
-              case Some(id) if state.players(player).hand.contains(id) =>
-                state.focus(_.players.index(player).graveyard).modify(_ + (id -> state.players(player).hand(id)))
-                  .focus(_.players.index(player).hand).modify(_.removed(id))
-              case Some(_) => state
-            }
+            if state.players(player).hand.contains(target) then
+              state.focus (_.players.index (player).graveyard).modify (_ + (target -> state.players (player).hand (target) ) )
+                .focus (_.players.index (player).hand).modify (_.removed (target) )
+            else 
+              state
 
           case Tapped(target, player) =>
             // TODO: Tap should trigger events instead

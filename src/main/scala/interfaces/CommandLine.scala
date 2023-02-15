@@ -14,6 +14,7 @@ import scala.util.{Failure, Success}
 object CommandLine {
 
   trait Status
+
   case object Initiate extends Status
   case object Prepare extends Status
   case class Ready(activePlayer: String) extends Status
@@ -35,8 +36,10 @@ object CommandLine {
           })
 
         case Prepare =>
-          print("Player One: "); val playerOne = scala.io.StdIn.readLine()
-          print("Player Two: "); val playerTwo = scala.io.StdIn.readLine()
+          print("Player One: ");
+          val playerOne = scala.io.StdIn.readLine()
+          print("Player Two: ");
+          val playerTwo = scala.io.StdIn.readLine()
 
           val players = Map(
             playerOne -> standardDeck,
@@ -60,10 +63,9 @@ object CommandLine {
             // TODO: Jline ?
             val actionOpt = input.toLowerCase.split(" ").toList match {
               case "tap" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Tap(ref, activePlayer, target.toInt))
-              case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Play(ref, activePlayer, target.toInt))
-              case "draw" :: count :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Draw(ref, activePlayer, count.toInt))
-              case "discard" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, None))
-              case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, Some(target.toInt)))
+              case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, target.toInt))
+              case "pass" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer))
+              case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, target.toInt))
               case _ => println("I don't understand your action"); context.self ! Ready(activePlayer); None
             }
 
@@ -72,6 +74,8 @@ object CommandLine {
               SendAction(context, cardboard, action, {
                 case state: game.InProgressState => render(state); Ready(state.playersTurn)
                 case state => println(s"Wrong state $state"); Terminate
+              }, {
+                text => println(text); Ready(activePlayer)
               })
             }
 
@@ -79,20 +83,22 @@ object CommandLine {
       }
     }
 
-   private def SendAction[Command, State](
+  private def SendAction[Command, State](
     context: ActorContext[CommandLine.Status],
     target: ActorRef[Command],
     request: ActorRef[StatusReply[State]] => Command,
-    onSuccess: State => CommandLine.Status)(implicit responseTimeout: Timeout, classTag: ClassTag[State]
-   ): Behavior[CommandLine.Status] = {
-     context.askWithStatus(target, request) {
-       case Success(state) => onSuccess(state)
-       case Failure(StatusReply.ErrorMessage(text)) => println(text); Terminate
-       case Failure(_) => println("An error occurred"); Terminate
-     }
-     Behaviors.same
+    onSuccess: State => CommandLine.Status,
+    onError: String => CommandLine.Status = {message => println(s"An error occurred ${message}"); Terminate},
+  )(implicit responseTimeout: Timeout, classTag: ClassTag[State]): Behavior[CommandLine.Status] = {
+    context.askWithStatus(target, request) {
+      case Success(state) => onSuccess(state)
+      case Failure(StatusReply.ErrorMessage(text)) => onError(text)
+      case Failure(ex) => onError(ex.getLocalizedMessage)
+    }
+    Behaviors.same
   }
 
+  // TODO: Add links to Scryfall
   private def render(state: InProgressState): Unit = {
     println("\n")
     val playerOne = state.players.head
@@ -121,8 +127,16 @@ object CommandLine {
     println(s"| 📚Library: ${playerState.library.size}")
     println(s"| 🪦Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
     println(s"| ✋ Hand (${playerState.hand.size}): ${playerState.hand.map(p => s"${p._2.name}[${p._1}]").mkString(", ")}")
-    // TODO: Use color for mana
-    println(s"| 🪄Mana: ${playerState.manaPool.map(m => s"${m._1} = ${m._2}").mkString(" / ")}")
+    println(s"| 🪄Mana: ${playerState.manaPool.map(m => s"${terminalColor(m._1)}${m._1} (${m._2})${Console.RESET}").mkString(" / ")}")
     println("|------------------")
+  }
+
+  private def terminalColor(c: Color): String = c match {
+    case Color.red => Console.RED
+    case Color.green => Console.GREEN
+    case Color.white => Console.WHITE
+    case Color.black => Console.BLACK
+    case Color.blue => Console.BLUE
+    case Color.none => Console.YELLOW
   }
 }
