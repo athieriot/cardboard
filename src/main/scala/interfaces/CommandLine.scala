@@ -6,10 +6,13 @@ import akka.pattern.StatusReply
 import akka.util.Timeout
 import cards.*
 import cards.mana.*
+import cards.types.LandType
 import game.*
-import org.jline.reader.LineReaderBuilder
-import org.jline.reader.impl.completer.{EnumCompleter, StringsCompleter}
-import org.jline.terminal.TerminalBuilder
+import org.jline.builtins.Completers.TreeCompleter.node
+import org.jline.builtins.Completers.{OptDesc, OptionCompleter, TreeCompleter}
+import org.jline.reader.{LineReader, LineReaderBuilder}
+import org.jline.reader.impl.completer.{ArgumentCompleter, EnumCompleter, StringsCompleter}
+import org.jline.terminal.{Terminal, TerminalBuilder}
 
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
@@ -24,14 +27,15 @@ object CommandLine {
   case class Ready(activePlayer: PlayerId) extends Status
   case object Terminate extends Status
 
+  private val terminal: Terminal = TerminalBuilder.terminal
+  private var lineReader: LineReader = LineReaderBuilder.builder()
+    .terminal(terminal)
+    .completer(new StringsCompleter("read", "play", "use", "pass", "cast", "discard", "exit"))
+    .build()
+
   def apply(instance: Behavior[Action]): Behavior[Status] =
     Behaviors.setup[CommandLine.Status] { context =>
       implicit val timeout: Timeout = 3.seconds
-
-      val lineReader = LineReaderBuilder.builder()
-        .terminal(TerminalBuilder.terminal)
-        .completer(new StringsCompleter("read", "play", "use", "pass", "discard", "exit"))
-        .build()
 
       val cardboard = context.spawn(instance, "game")
 
@@ -66,22 +70,21 @@ object CommandLine {
             context.self ! Terminate
             Behaviors.same
           else
-            // TODO: Jline ?
             val actionOpt = inputs match {
               case "read" :: _ :: Nil => Some(Recover.apply)
-              case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, target.toInt))
-              case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, activePlayer, target.toInt))
-              case "use" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Use(ref, activePlayer, target.toInt, abilityId.toInt))
+              case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, readIdFromArg(target)))
+              case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, activePlayer, readIdFromArg(target)))
+              case "use" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Use(ref, activePlayer, readIdFromArg(target), abilityId.toInt))
               case "pass" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer, None))
               case "pass" :: times :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer, Some(times.toInt)))
-              case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, target.toInt))
+              case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, readIdFromArg(target)))
               case _ => println("I don't understand your action"); context.self ! Ready(activePlayer); None
             }
 
             actionOpt.foreach { action =>
               println(s"$input")
               SendAction(context, cardboard, action, {
-                case state: game.InProgressState if inputs.head == "read" => renderCard(state, inputs.tail.head.toInt); Ready(state.playersTurn)
+                case state: game.InProgressState if inputs.head == "read" => renderCard(state, readIdFromArg(inputs.tail.head)); Ready(state.playersTurn)
                 case state: game.InProgressState => render(state); Ready(state.playersTurn)
                 case state => println(s"Wrong state $state"); Terminate
               }, {
@@ -108,8 +111,27 @@ object CommandLine {
     Behaviors.same
   }
 
-  // TODO: Add links to Scryfall
+  private def refreshAutoComplete(state: InProgressState): Unit = {
+    val collection: Map[CardId, Card] = state.battleField.view.mapValues(_.card).toMap ++ state.stack.view.mapValues(_.card).toMap
+      ++ state.players.flatMap(player => player._2.hand ++ player._2.graveyard ++ player._2.exile).view
+
+    lineReader = LineReaderBuilder.builder()
+      .terminal(terminal)
+      .completer(new TreeCompleter(
+        node("read", node(collection.map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[LandType]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[LandType]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("use", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
+        node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("pass"),
+        node("exit"),
+      ))
+      .build()
+  }
+
   private def render(state: InProgressState): Unit = {
+    refreshAutoComplete(state)
+
     println("\n")
     val playerOne = state.players.head
     val playerTwo = state.players.last
@@ -118,9 +140,11 @@ object CommandLine {
     // TODO: Display summoning sickness
     // TODO: Show each types (Creatures, Artefacts, Enchantments, Planeswalkers) on a different line
     println(s"| ✋ Hand (${playerOne._2.hand.size}): ${playerOne._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
-    println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
     println("|------------------")
+    println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println("\n")
     println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerTwo._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println("|------------------")
     println(s"| ✋ Hand (${playerTwo._2.hand.size}): ${playerTwo._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
 
     renderPlayer(state, playerTwo._1, playerTwo._2)
@@ -142,6 +166,8 @@ object CommandLine {
     println("|------------------")
   }
 
+  def renderArg(id: CardId, card: Card): String = s"${card.name.replace(" ", "_")}[$id]"
+  def readIdFromArg(name: String): CardId = name.split("[\\[\\]]").last.toInt
   def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
 
   def renderCard(state: InProgressState, target: CardId): Unit = {
@@ -156,7 +182,7 @@ object CommandLine {
         println(s"|Color: ${terminalColor(card.color, card.color.toString)}")
         println(s"|Cost: ${card.cost.toString}")
         println(s"|Preview: ${card.preview}")
-        print("|Abilities:")
+        print("|Abilities:\n")
         card.activatedAbilities.foreach { (i, ability) =>
           println(s"|\t[$i]: [${ability.cost.toString}], ${ability.text}")
         }
