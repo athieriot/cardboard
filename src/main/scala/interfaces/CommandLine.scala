@@ -30,7 +30,7 @@ object CommandLine {
 
       val lineReader = LineReaderBuilder.builder()
         .terminal(TerminalBuilder.terminal)
-        .completer(new StringsCompleter("play", "use", "pass", "discard", "exit"))
+        .completer(new StringsCompleter("read", "play", "use", "pass", "discard", "exit"))
         .build()
 
       val cardboard = context.spawn(instance, "game")
@@ -60,17 +60,20 @@ object CommandLine {
 
         case Ready(activePlayer) =>
           val input = lineReader.readLine(s"|$activePlayer|> ")
+          val inputs = input.toLowerCase.split(" ").toList
 
-          if input == "exit" then
+          if inputs.head == "exit" then
             context.self ! Terminate
             Behaviors.same
           else
             // TODO: Jline ?
-            val actionOpt = input.toLowerCase.split(" ").toList match {
+            val actionOpt = inputs match {
+              case "read" :: _ :: Nil => Some(Recover.apply)
               case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, target.toInt))
               case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, activePlayer, target.toInt))
               case "use" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Use(ref, activePlayer, target.toInt, abilityId.toInt))
-              case "pass" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer))
+              case "pass" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer, None))
+              case "pass" :: times :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer, Some(times.toInt)))
               case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, target.toInt))
               case _ => println("I don't understand your action"); context.self ! Ready(activePlayer); None
             }
@@ -78,6 +81,7 @@ object CommandLine {
             actionOpt.foreach { action =>
               println(s"$input")
               SendAction(context, cardboard, action, {
+                case state: game.InProgressState if inputs.head == "read" => renderCard(state, inputs.tail.head.toInt); Ready(state.playersTurn)
                 case state: game.InProgressState => render(state); Ready(state.playersTurn)
                 case state => println(s"Wrong state $state"); Terminate
               }, {
@@ -121,7 +125,7 @@ object CommandLine {
 
     renderPlayer(state, playerTwo._1, playerTwo._2)
 
-    println(s"| Phase: ${Phase.values.map(phase => if state.phase == phase then s"🌙$phase" else phase).mkString(", ")}")
+    println(s"| Phase: ${Phases.values.map(phase => if state.phase == phase then s"🌙$phase" else phase).mkString(", ")}")
     println("|------------------")
     println("\n")
   }
@@ -139,6 +143,25 @@ object CommandLine {
   }
 
   def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
+
+  def renderCard(state: InProgressState, target: CardId): Unit = {
+    val collection: Map[CardId, Card] = state.battleField.view.mapValues(_.card).toMap ++ state.stack.view.mapValues(_.card).toMap
+      ++ state.players.flatMap(player => player._2.hand ++ player._2.graveyard ++ player._2.exile).view
+
+    collection.get(target) match {
+      case None => println("Card not found")
+      case Some(card) =>
+        println(s"|Name: ${card.name}")
+        println(s"|Subtype: ${card.subTypes.mkString(" - ")}")
+        println(s"|Color: ${terminalColor(card.color, card.color.toString)}")
+        println(s"|Cost: ${card.cost.toString}")
+        println(s"|Preview: ${card.preview}")
+        print("|Abilities:")
+        card.activatedAbilities.foreach { (i, ability) =>
+          println(s"|\t[$i]: [${ability.cost.toString}], ${ability.text}")
+        }
+    }
+  }
 
   private def terminalColor(c: Color, text: String): String = c match {
     case Color.red => s"${Console.RED}$text${Console.RESET}"

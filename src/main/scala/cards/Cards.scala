@@ -16,7 +16,7 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
   def isValid: Boolean = cards.length >= MIN_DECK_SIZE
 }
 
-case class Ability(cost: AbilityCost, effect: (InProgressState, String) => List[Event])
+case class Ability(cost: AbilityCost, text: String, effect: (InProgressState, String) => List[Event])
 
 enum Type {
   case artifact, creature, enchantment, instant, land, planesWalker, sorcery

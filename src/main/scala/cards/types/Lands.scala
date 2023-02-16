@@ -26,7 +26,7 @@ case class BasicLand(
   cost: CastingCost = ManaCost("0")
 ) extends LandType {
   def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(Tap, (_, player) => List(ManaAdded(Map(colorProduced -> 1), player)))
+    1 -> Ability(Tap, s"Add one ${colorProduced.toString} mana", (_, player) => List(ManaAdded(Map(colorProduced -> 1), player)))
   )
 }
 

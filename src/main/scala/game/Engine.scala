@@ -11,6 +11,7 @@ import game.*
 import monocle.syntax.all.*
 
 import java.util.UUID
+import scala.collection.MapView
 import scala.util.{Failure, Success, Try}
 
 object Engine {
@@ -55,15 +56,16 @@ object Engine {
             }
           }
 
-          // TODO: Pass turn would be cool
-          // TODO: Should we add events or persist first ?
-          // TODO: Check conditions for End step, like hand size ?
-          case Pass(replyTo, player) => checkPriority(replyTo, state, player) {
-            Effect.persist(Moved(state.phase.next()) +: state.phase.next().turnBasedActions(player))
-              .thenReply(replyTo)(state => StatusReply.Success(state))
+          // TODO: Should we add events or persist first ? Maybe having a persist loop until no trigger left
+          case Pass(replyTo, player, times: Option[Int]) => checkPriority(replyTo, state, player) {
+            Effect.persist(
+              (1 to times.getOrElse(1)).foldLeft((state.phase, List.empty[Event])) { case ((phase, events), _) =>
+                val nextPhase = phase.next()
+                (nextPhase, events ++ (Moved(nextPhase) +: nextPhase.turnBasedActions(player)))
+              }._2
+            ).thenReply(replyTo)(state => StatusReply.Success(state))
           }
 
-          // TODO: Have a command to Read the text and abilities
           case Use(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
               case Some(spell) =>

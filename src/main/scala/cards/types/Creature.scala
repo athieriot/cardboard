@@ -17,9 +17,13 @@ case class Creature(
   preview: URL,
 ) extends Card {
   def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(Tap, (_, player) => List(ManaAdded(Map(Color.green -> 1), player)))
+    1 -> Ability(Tap, "Add one green mana",  (_, player) => List(ManaAdded(Map(Color.green -> 1), player)))
   )
 }
 
-
-val llanowarElf = Creature("Llanowar Elf", List("Creature", "Elf Druid"), Color.green, ManaCost("G"), new URL("https://scryfall.com/card/m19/314/llanowar-elves"))
+val llanowarElf = Creature(
+  "Llanowar Elf",
+  List("Creature", "Elf Druid"), 
+  Color.green, ManaCost("G"),
+  new URL("https://scryfall.com/card/m19/314/llanowar-elves")
+)

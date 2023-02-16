@@ -16,7 +16,7 @@ sealed trait Action {
 final case class Recover(replyTo: ActorRef[StatusReply[State]]) extends Action
 final case class New(replyTo: ActorRef[StatusReply[State]], players: Map[String, Deck]) extends Action
 
-final case class Pass(replyTo: ActorRef[StatusReply[State]], player: PlayerId) extends Action
+final case class Pass(replyTo: ActorRef[StatusReply[State]], player: PlayerId, times: Option[Int]) extends Action
 final case class PlayLand(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 final case class Cast(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 final case class Use(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId, abilityId: Int) extends Action
@@ -32,7 +32,7 @@ sealed trait Event
 final case class Created(die: Int, players: Map[String, Deck]) extends Event
 
 sealed trait StateBaseEvent extends Event
-final case class Moved(phase: Phase) extends StateBaseEvent
+final case class Moved(phase: Phases) extends StateBaseEvent
 case object PlayerSwapped extends StateBaseEvent
 case object ManaPoolEmptied extends StateBaseEvent
 case object Untapped extends StateBaseEvent

@@ -54,14 +54,14 @@ case object EmptyState extends State
 // TODO: State = Number of Mulligan
 // TODO: State = Number of Turns
 case class InProgressState(
-  // TODO: Should that be State types ?
-  playersTurn: String,
-  priority: String,
-  players: Map[String, PlayerState],
-  phase: Phase = Phase.preCombatMain,
-  stack: Map[CardId, Spell] = Map.empty,
-  battleField: Map[CardId, Spell] = Map.empty,
-  highestId: CardId = 5,
+                            // TODO: Should that be State types ?
+                            playersTurn: String,
+                            priority: String,
+                            players: Map[String, PlayerState],
+                            phase: Phases = Phases.preCombatMain,
+                            stack: Map[CardId, Spell] = Map.empty,
+                            battleField: Map[CardId, Spell] = Map.empty,
+                            highestId: CardId = 5,
 ) extends State {
 
   // TODO: I feel like this should go in the LandType class
