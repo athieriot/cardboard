@@ -1,29 +1,33 @@
 package game
 
 import cards.*
+import cards.mana.ManaPool
+import cards.types.LandType
 import game.Status.Untapped
 
 import java.util.UUID
 import scala.collection.mutable
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
+import monocle.syntax.all.*
+
+import scala.annotation.targetName
 
 type CardId = Int
-// TODO: Propagate
 type PlayerId = String
 
 enum Status {
   case Tapped, Untapped
 }
 
-// TODO: Might be called a Spell ? Except for Lands
-case class Instance(
+// TODO: Lands instances are not called Spells
+case class Spell(
   card: Card,
   owner: String,
   controller: String,
   status: Status = Untapped,
   firstTurn: Boolean = true
 ) {
-  def unTap: Instance = {
+  def unTap: Spell = {
     this.copy(status = Status.Untapped)
   }
 }
@@ -32,7 +36,7 @@ case class PlayerState(
   library: List[Card] = List.empty,
   life: Int = 20,
   turn: TurnState = TurnState(),
-  manaPool: Map[Color, Int] = Color.values.map((_, 0)).toMap,
+  manaPool: ManaPool = ManaPool.empty(),
   hand: Map[CardId, Card] = Map.empty,
   graveyard: Map[CardId, Card] = Map.empty,
   exile: Map[CardId, Card] = Map.empty,
@@ -55,9 +59,9 @@ case class InProgressState(
   priority: String,
   players: Map[String, PlayerState],
   phase: Phase = Phase.preCombatMain,
-  stack: Map[CardId, Instance] = Map.empty,
-  battleField: Map[CardId, Instance] = Map.empty,
-  highestId: CardId = 1,
+  stack: Map[CardId, Spell] = Map.empty,
+  battleField: Map[CardId, Spell] = Map.empty,
+  highestId: CardId = 5,
 ) extends State {
 
   // TODO: I feel like this should go in the LandType class

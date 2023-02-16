@@ -8,8 +8,9 @@ enum Phase {
   // TODO: Implement Turn Based checks ?
   // TODO: Implement more Turn Based actions
   def turnBasedActions(player: PlayerId): List[Event] = List(ManaPoolEmptied) ++ { this match {
-    case Phase.unTap => List(PlayerSwap, Untapped, CleanTurnState)
+    case Phase.unTap => List(PlayerSwapped, Untapped)
     case Phase.draw => List(Drawn(1, player))
+    case Phase.cleanup => List(TurnStateCleaned)
     case _ => List()
   }}
 

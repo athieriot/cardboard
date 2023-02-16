@@ -1,6 +1,7 @@
-package cards
+package cards.types
 
 import cards.*
+import cards.mana.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 import monocle.syntax.all.*
@@ -22,7 +23,7 @@ case class BasicLand(
   colorProduced: Color,
   preview: URL,
   color: Color = Color.none,
-  manaCost: Option[ManaCost] = Some(ManaCost("0"))
+  cost: CastingCost = ManaCost("0")
 ) extends LandType {
   def activatedAbilities: Map[Int, Ability] = Map(
     1 -> Ability(Tap, (_, player) => List(ManaAdded(Map(colorProduced -> 1), player)))

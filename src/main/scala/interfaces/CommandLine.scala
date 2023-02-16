@@ -5,6 +5,7 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.pattern.StatusReply
 import akka.util.Timeout
 import cards.*
+import cards.mana.*
 import game.*
 import org.jline.reader.LineReaderBuilder
 import org.jline.reader.impl.completer.{EnumCompleter, StringsCompleter}
@@ -67,6 +68,7 @@ object CommandLine {
             // TODO: Jline ?
             val actionOpt = input.toLowerCase.split(" ").toList match {
               case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, activePlayer, target.toInt))
+              case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, activePlayer, target.toInt))
               case "use" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Use(ref, activePlayer, target.toInt, abilityId.toInt))
               case "pass" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Pass(ref, activePlayer))
               case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, activePlayer, target.toInt))
@@ -103,7 +105,6 @@ object CommandLine {
   }
 
   // TODO: Add links to Scryfall
-  // TODO: Card names in color ?
   private def render(state: InProgressState): Unit = {
     println("\n")
     val playerOne = state.players.head
@@ -112,9 +113,11 @@ object CommandLine {
 
     // TODO: Display summoning sickness
     // TODO: Show each types (Creatures, Artefacts, Enchantments, Planeswalkers) on a different line
-    println(s"🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"| ✋ Hand (${playerOne._2.hand.size}): ${playerOne._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
     println("|------------------")
-    println(s"🌳Lands: ${state.battleField.filter(_._2.owner == playerTwo._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerTwo._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"| ✋ Hand (${playerTwo._2.hand.size}): ${playerTwo._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
 
     renderPlayer(state, playerTwo._1, playerTwo._2)
 
@@ -131,8 +134,7 @@ object CommandLine {
     println(s"| Player: $active$name$priority - Life: ${playerState.life}")
     println(s"| 📚Library: ${playerState.library.size}")
     println(s"| 🪦Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2)).mkString(", ")}")
-    println(s"| ✋ Hand (${playerState.hand.size}): ${playerState.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
-    println(s"| 🪄Mana: ${playerState.manaPool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")
+    println(s"| 🪄Mana: ${playerState.manaPool.pool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")
     println("|------------------")
   }
 

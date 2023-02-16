@@ -5,6 +5,8 @@ import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import cards.*
+import cards.mana.ManaPool
+import cards.types.LandType
 import game.*
 import monocle.syntax.all.*
 
@@ -48,7 +50,7 @@ object Engine {
 
           case PlayLand(replyTo, player, target) => checkPriority(replyTo, state, player) {
             state.landPlayCheck(player, target) match {
-              case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+              case Success(_) => Effect.persist(EnteredTheBattlefield(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
               case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
             }
           }
@@ -64,15 +66,29 @@ object Engine {
           // TODO: Have a command to Read the text and abilities
           case Use(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
-              case Some(instance) =>
-                instance.card.activatedAbilities.get(abilityId) match {
+              case Some(spell) =>
+                spell.card.activatedAbilities.get(abilityId) match {
                   case Some(ability) =>
-                    if ability.cost.check(instance) then
+                    if ability.cost.check(spell) then
                       Effect.persist(ability.cost.pay(target, player) ++ ability.effect(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
                     else
                       Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
                   case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Abilities not found"))
                 }
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+            }
+          }
+
+          case Cast(replyTo, player, target) => checkPriority(replyTo, state, player) { // Player Wrapper
+            state.players(player).hand.get(target) match {
+              case Some(card) =>
+                // TODO: Should also check speed conditions !!!
+                // TODO: There can be alternative costs also
+                // TODO: ETB triggers
+                if card.cost.check(state, player) then
+                  Effect.persist(card.cost.pay(target, player) :+ EnteredTheBattlefield(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                else
+                  Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
           }
@@ -110,30 +126,33 @@ object Engine {
       case state: InProgressState =>
         event match {
           case Moved(phase) => state.focus(_.phase).replace(phase)
-          case PlayerSwap =>
+          case PlayerSwapped =>
             val nextPlayer = state.players.keys.sliding(2).find(_.head == state.playersTurn).map(_.last).getOrElse(state.players.keys.head)
-            // TODO: Priority should be anoter Event
+            // TODO: Priority should be another Event
             state.focus(_.playersTurn).replace(nextPlayer).focus(_.priority).replace(nextPlayer)
 
-          case CleanTurnState => state.players.keys.foldLeft(state) { (state, player) =>
+          case TurnStateCleaned => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).turn).replace(TurnState())
           }
 
           case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
-            state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, 0)))
+            state.focus(_.players.index(player).manaPool).replace(ManaPool.empty())
           }
           case ManaAdded(mana, player) =>
-            state.focus(_.players.index(player).manaPool).modify(_.map(p => (p._1, p._2 + mana.getOrElse(p._1, 0))))
+            state.focus(_.players.index(player).manaPool).modify(_ ++ mana)
+          case ManaPaid(manaCost, player) =>
+            state.focus(_.players.index(player).manaPool).modify(mp => (mp - manaCost).get)
 
           case Shuffled(order, player) =>
             val shuffled = order.zip(state.players(player).library).sortBy(_._1).map(_._2)
             state.focus(_.players.index(player).library).replace(shuffled)
 
-          case LandPlayed(target, player) =>
-            val instance = Instance(state.players(player).hand(target), player, player)
-            state.focus(_.battleField).modify(_ + (target -> instance))
+          case EnteredTheBattlefield(target, player) =>
+            val spell = Spell(state.players(player).hand(target), player, player)
+            state.focus(_.battleField).modify(_ + (target -> spell))
               .focus(_.players.index(player).hand).modify(_.removed(target))
-              .focus(_.players.index(player).turn.landsToPlay).modify(_ - 1)
+              // TODO: Could be more readable ?
+              .focus(_.players.index(player).turn.landsToPlay).modify(_ - (if spell.card.isInstanceOf[LandType] then 1 else 0))
 
           // TODO: Extract some of those focus
           case Drawn(amount, player) =>
