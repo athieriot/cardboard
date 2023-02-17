@@ -3,6 +3,7 @@ package cards
 import game.*
 
 enum Step {
+  // TODO: Should stop if end of turn + EndTurn Command
   def next(): Step = Step.values.sliding(2).find(_.head == this).map(_.last).getOrElse(unTap)
 
   private def commonTurnBasedActions(state: BoardState): List[Event] =

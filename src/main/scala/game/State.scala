@@ -2,7 +2,7 @@ package game
 
 import cards.*
 import cards.mana.ManaPool
-import cards.types.LandType
+import cards.types.*
 import game.Status.Untapped
 
 import java.util.UUID
@@ -62,7 +62,7 @@ case class BoardState(
   playersTurn: String,
   priority: String,
   players: Map[String, PlayerState],
-  phase: Step = Step.preCombatMain,
+  currentStep: Step = Step.preCombatMain,
   stack: Map[CardId, Spell] = Map.empty,
   battleField: Map[CardId, Permanent] = Map.empty,
   highestId: CardId = 5,
@@ -70,16 +70,4 @@ case class BoardState(
 
   def nextPlayer: String = players.keys.sliding(2).find(_.head == playersTurn).map(_.last).getOrElse(players.keys.head)
   def nextPriority: String = players.keys.sliding(2).find(_.head == priority).map(_.last).getOrElse(players.keys.head)
-
-  // TODO: I feel like this should go in the LandType class
-  def landPlayCheck(player: PlayerId, target: CardId): Try[Unit] = Try {
-    if !this.players(player).hand.get(target).exists(_.isInstanceOf[LandType]) then
-      throw new RuntimeException("Target is not a Land")
-    else if this.playersTurn != player then
-      throw new RuntimeException("You can only play lands during your turn")
-    else if !this.phase.isMain then
-      throw new RuntimeException("You can only play lands during a main phase")
-    else if this.players(player).turn.landsToPlay <= 0 then
-      throw new RuntimeException("You already played a land this turn")
-  }
 }

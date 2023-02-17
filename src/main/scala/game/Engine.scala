@@ -19,6 +19,7 @@ object Engine {
   private val OPENING_HAND = 7
 
   // Should there be a context object ?
+  // TODO: Have a wrapper to fetch Target once we have "from" parameter
   private def checkPriority(replyTo: ActorRef[StatusReply[State]], state: BoardState, player: PlayerId)(block: => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
     if state.priority == player then
       block
@@ -49,9 +50,13 @@ object Engine {
           case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
 
           case PlayLand(replyTo, player, target) => checkPriority(replyTo, state, player) {
-            state.landPlayCheck(player, target) match {
-              case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
-              case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
+            state.players(player).hand.get(target) match {
+              case Some(land: Land) => land.checkConditions(state, player) match {
+                case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
+              }
+              case Some(_) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target is not a land"))
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
           }
 
@@ -60,7 +65,7 @@ object Engine {
             if state.stack.isEmpty then
               // Move phase
               Effect.persist(
-                (1 to times.getOrElse(1)).foldLeft((state.phase, List.empty[Event])) { case ((phase, events), _) =>
+                (1 to times.getOrElse(1)).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
                   val nextPhase = phase.next()
                   (nextPhase, events ++ (Moved(nextPhase) +: nextPhase.turnBasedActions(state, player)))
                 }._2
@@ -80,7 +85,7 @@ object Engine {
               case Some(spell) =>
                 spell.card.activatedAbilities.get(abilityId) match {
                   case Some(ability) =>
-                    if ability.cost.check(spell) then
+                    if ability.cost.canPay(spell) then
                       Effect.persist(ability.cost.pay(target, player) ++ ability.effect(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
                     else
                       Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
@@ -92,14 +97,12 @@ object Engine {
 
           case Cast(replyTo, player, target) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.players(player).hand.get(target) match {
-              case Some(card) =>
-                // TODO: Should also check speed conditions !!! (Sorcery = Main phase, empty stack)
-                // TODO: There can be alternative costs also
-                // TODO: ETB triggers
-                if card.cost.check(state, player) then
-                  Effect.persist(card.cost.pay(target, player) ++ List(Stacked(target, player), PriorityPassed(state.nextPriority))).thenReply(replyTo)(state => StatusReply.Success(state))
-                else
-                  Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
+              // TODO: There can be alternative costs also
+              // TODO: ETB triggers
+              case Some(card) => card.checkConditions(state, player) match {
+                case Success(_) => Effect.persist(card.cost.pay(target, player) ++ List(Stacked(target, player), PriorityPassed(state.nextPriority))).thenReply(replyTo)(state => StatusReply.Success(state))
+                case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
+              }
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
           }
@@ -114,7 +117,7 @@ object Engine {
           case _ => Effect.noReply
 
           // TODO: When pass priority, check state based actions
-          // TODO: Implement priority/Mulligan
+          // TODO: Implement Mulligan
         }
     }
   }
@@ -136,7 +139,7 @@ object Engine {
 
       case state: BoardState =>
         event match {
-          case Moved(phase) => state.focus(_.phase).replace(phase)
+          case Moved(phase) => state.focus(_.currentStep).replace(phase)
           case TurnStateCleaned => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).turn).replace(TurnState())
           }

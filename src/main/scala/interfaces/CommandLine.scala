@@ -47,6 +47,8 @@ object CommandLine {
           })
 
         case Prepare =>
+          val forest = Forest("one", 275)
+          val llanowarElf = LlanowarElf("m19", 314)
           val standardDeck: Deck = Deck((1 to 30).map(_ => forest).toList ++ (1 to 30).map(_ => llanowarElf))
           
           val playerOne = lineReader.readLine("Player One: ")
@@ -119,8 +121,8 @@ object CommandLine {
       .terminal(terminal)
       .completer(new TreeCompleter(
         node("read", node(collection.map(c => renderArg(c._1, c._2)).toList: _*)),
-        node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[LandType]).map(c => renderArg(c._1, c._2)).toList: _*)),
-        node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[LandType]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
         if !state.battleField.exists(_._2.owner == state.priority) then node("activate") else node("activate", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2)).toList: _*)),
         node("next"),
@@ -151,7 +153,7 @@ object CommandLine {
 
     renderPlayer(state, playerTwo._1, playerTwo._2)
 
-    println(s"| Phase: ${Step.values.map(phase => if state.phase == phase then s"🌙$phase" else phase).mkString(", ")}")
+    println(s"| Phase: ${Step.values.map(phase => if state.currentStep == phase then s"🌙$phase" else phase).mkString(", ")}")
     println("|------------------")
     println("\n")
   }

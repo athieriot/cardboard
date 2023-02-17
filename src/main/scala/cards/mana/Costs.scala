@@ -4,12 +4,15 @@ import cards.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 
+case class Ability(cost: AbilityCost, text: String, effect: (BoardState, String) => List[Event])
+
 trait AbilityCost {
-  def check(target: Permanent): Boolean
+  // TODO: Feel like the target should be on the Ability instance
+  def canPay(target: Permanent): Boolean
   def pay(target: CardId, player: PlayerId): List[Event]
 }
 case object Tap extends AbilityCost {
-  def check(target: Permanent): Boolean = target.status == Status.Untapped
+  def canPay(target: Permanent): Boolean = target.status == Status.Untapped
   def pay(target: CardId, player: PlayerId): List[Event] = List(Tapped(target))
 }
 
@@ -20,11 +23,11 @@ case object Tap extends AbilityCost {
   )
 )
 trait CastingCost {
-  def check(state: BoardState, player: PlayerId): Boolean
+  def canPay(state: BoardState, player: PlayerId): Boolean
   def pay(target: CardId, player: PlayerId): List[Event]
 }
-// TODO: Validate valid ManaCost
+// TODO: Validate valid ManaCost text
 case class ManaCost(text: String) extends CastingCost {
-  def check(state: BoardState, player: PlayerId): Boolean = (state.players(player).manaPool - this).isSuccess
+  def canPay(state: BoardState, player: PlayerId): Boolean = (state.players(player).manaPool - this).isSuccess
   def pay(target: CardId, player: PlayerId): List[Event] = List(ManaPaid(this, player))
 }

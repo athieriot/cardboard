@@ -15,27 +15,42 @@ import scala.util.Try
     new JsonSubTypes.Type(value = classOf[BasicLand], name = "basicLand"),
   )
 )
-trait LandType extends Card
+sealed abstract class Land extends Card {
+  def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {
+    if state.playersTurn != player then
+      throw new RuntimeException("You can only play lands during your turn")
+    else if !state.currentStep.isMain then
+      throw new RuntimeException("You can only play lands during a main phase")
+    else if state.stack.nonEmpty then
+      throw new RuntimeException("You can only play lands when the stack is empty")
+    else if state.players(player).turn.landsToPlay <= 0 then
+      throw new RuntimeException("You already played a land this turn")
+  }
+}
 
-case class BasicLand(
-  name: String,
-  subTypes: List[String],
-  colorProduced: Color,
-  preview: URL,
-  color: Color = Color.none,
-  cost: CastingCost = ManaCost("0")
-) extends LandType {
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+@JsonSubTypes(
+  Array(
+    new JsonSubTypes.Type(value = classOf[Forest], name = "forest"),
+//    new JsonSubTypes.Type(value = classOf[Mountain], name = "mountain"),
+//    new JsonSubTypes.Type(value = classOf[Island], name = "island"),
+//    new JsonSubTypes.Type(value = classOf[Swamp], name = "swamp"),
+//    new JsonSubTypes.Type(value = classOf[Plains], name = "plains"),
+  )
+)
+sealed abstract class BasicLand extends Land {
+  val color: Color = Color.none
+  
+  def colorProduced: Color
+  
   def activatedAbilities: Map[Int, Ability] = Map(
     1 -> Ability(Tap, s"Add one ${colorProduced.toString} mana", (_, player) => List(ManaAdded(Map(colorProduced -> 1), player)))
   )
 }
 
-// TODO: Should use Pattern Matching
-val forest = BasicLand("Forest", List("Basic Land", "Forest"), Color.green, new URL("https://scryfall.com/card/one/276/forest"))
-val mountain = BasicLand("Mountain", List("Basic Land", "Mountain"), Color.red, new URL("https://scryfall.com/card/one/275/mountain"))
-val swamp = BasicLand("Swamp", List("Basic Land", "Swamp"), Color.black, new URL("https://scryfall.com/card/one/274/swamp"))
-val plains = BasicLand("Plains", List("Basic Land", "Plains"), Color.white, new URL("https://scryfall.com/card/one/272/plains"))
-val island = BasicLand("Island", List("Basic Land", "Island"), Color.blue, new URL("https://scryfall.com/card/one/273/island"))
-val wastes = BasicLand("Wastes", List("Basic Land", "Wastes"), Color.none, new URL("https://scryfall.com/card/ogw/183a/wastes"))
-
-val basicLands = List(forest, mountain, swamp, plains, island)
+class Forest(val set: String, val numberInSet: Int) extends BasicLand {
+  val name: String = "Forest"
+  val subTypes: List[String] = List("Basic Land", "Forest")
+  val cost: CastingCost = ManaCost("G")
+  val colorProduced: Color = Color.green
+}
