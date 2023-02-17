@@ -5,11 +5,11 @@ import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 
 trait AbilityCost {
-  def check(target: Spell): Boolean
+  def check(target: Permanent): Boolean
   def pay(target: CardId, player: PlayerId): List[Event]
 }
 case object Tap extends AbilityCost {
-  def check(target: Spell): Boolean = target.status == Status.Untapped
+  def check(target: Permanent): Boolean = target.status == Status.Untapped
   def pay(target: CardId, player: PlayerId): List[Event] = List(Tapped(target))
 }
 

@@ -18,10 +18,6 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 
 case class Ability(cost: AbilityCost, text: String, effect: (BoardState, String) => List[Event])
 
-enum Type {
-  case artifact, creature, enchantment, instant, land, planesWalker, sorcery
-}
-
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
   Array(
@@ -38,5 +34,3 @@ trait Card {
   val preview: URL
   def activatedAbilities: Map[Int, Ability]
 }
-
-val standardDeck: Deck = Deck((1 to 30).map(_ => forest).toList ++ (1 to 30).map(_ => llanowarElf))

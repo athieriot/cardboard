@@ -6,7 +6,7 @@ import akka.pattern.StatusReply
 import akka.util.Timeout
 import cards.*
 import cards.mana.*
-import cards.types.LandType
+import cards.types.*
 import game.*
 import interfaces.CommandLine.renderName
 import org.jline.builtins.Completers.TreeCompleter.node
@@ -47,6 +47,8 @@ object CommandLine {
           })
 
         case Prepare =>
+          val standardDeck: Deck = Deck((1 to 30).map(_ => forest).toList ++ (1 to 30).map(_ => llanowarElf))
+          
           val playerOne = lineReader.readLine("Player One: ")
           val playerTwo = lineReader.readLine("Player Two: ")
 

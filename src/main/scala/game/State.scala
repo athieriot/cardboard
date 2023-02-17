@@ -19,15 +19,20 @@ enum Status {
   case Tapped, Untapped
 }
 
-// TODO: Lands instances are not called Spells
 case class Spell(
+  card: Card,
+  owner: String,
+  controller: String,
+)
+
+case class Permanent(
   card: Card,
   owner: String,
   controller: String,
   status: Status = Untapped,
   firstTurn: Boolean = true
 ) {
-  def unTap: Spell = {
+  def unTap: Permanent = {
     this.copy(status = Status.Untapped)
   }
 }
@@ -54,13 +59,12 @@ case object EmptyState extends State
 // TODO: State = Number of Mulligan
 // TODO: State = Number of Turns
 case class BoardState(
-  // TODO: Should that be State types ?
   playersTurn: String,
   priority: String,
   players: Map[String, PlayerState],
   phase: Step = Step.preCombatMain,
   stack: Map[CardId, Spell] = Map.empty,
-  battleField: Map[CardId, Spell] = Map.empty,
+  battleField: Map[CardId, Permanent] = Map.empty,
   highestId: CardId = 5,
 ) extends State {
 

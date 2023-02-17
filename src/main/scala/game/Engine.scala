@@ -165,13 +165,12 @@ object Engine {
 
           case EnteredTheBattlefield(target) =>
             val spell = state.stack(target)
-            state.focus(_.battleField).modify(_ + (target -> spell))
+            state.focus(_.battleField).modify(_ + (target -> Permanent(spell.card, spell.owner, spell.controller)))
               .focus(_.stack).modify(_.removed(target))
 
           // TODO: Oh no, target can come from the hand or the stack (Or other zones ?)
-          // TODO: Oh no, we can cast from the graveyard also !
           case LandPlayed(target, player) =>
-            val land = Spell(state.players(player).hand(target), player, player)
+            val land = Permanent(state.players(player).hand(target), player, player)
             state.focus(_.battleField).modify(_ + (target -> land))
               .focus(_.players.index(player).hand).modify(_.removed(target))
               .focus(_.players.index(player).turn.landsToPlay).modify(_ - 1)
