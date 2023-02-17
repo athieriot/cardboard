@@ -16,7 +16,7 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
   def isValid: Boolean = cards.length >= MIN_DECK_SIZE
 }
 
-case class Ability(cost: AbilityCost, text: String, effect: (InProgressState, String) => List[Event])
+case class Ability(cost: AbilityCost, text: String, effect: (BoardState, String) => List[Event])
 
 enum Type {
   case artifact, creature, enchantment, instant, land, planesWalker, sorcery
@@ -33,7 +33,7 @@ trait Card {
   val name: String
   val subTypes: List[String]
   val color: Color
-  // TODO: Some cards have no mana cost (Miracle ?)
+  // TODO: Some cards have no mana cost (Ex: Miracle)
   val cost: CastingCost
   val preview: URL
   def activatedAbilities: Map[Int, Ability]

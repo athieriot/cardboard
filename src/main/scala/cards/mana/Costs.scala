@@ -20,11 +20,11 @@ case object Tap extends AbilityCost {
   )
 )
 trait CastingCost {
-  def check(state: InProgressState, player: PlayerId): Boolean
+  def check(state: BoardState, player: PlayerId): Boolean
   def pay(target: CardId, player: PlayerId): List[Event]
 }
 // TODO: Validate valid ManaCost
 case class ManaCost(text: String) extends CastingCost {
-  def check(state: InProgressState, player: PlayerId): Boolean = (state.players(player).manaPool - this).isSuccess
+  def check(state: BoardState, player: PlayerId): Boolean = (state.players(player).manaPool - this).isSuccess
   def pay(target: CardId, player: PlayerId): List[Event] = List(ManaPaid(this, player))
 }

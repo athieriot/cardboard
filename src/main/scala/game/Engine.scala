@@ -5,8 +5,8 @@ import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import cards.*
-import cards.mana.ManaPool
-import cards.types.LandType
+import cards.mana.*
+import cards.types.*
 import game.*
 import monocle.syntax.all.*
 
@@ -19,13 +19,12 @@ object Engine {
   private val OPENING_HAND = 7
 
   // Should there be a context object ?
-  private def checkPriority(replyTo: ActorRef[StatusReply[State]], state: InProgressState, player: PlayerId)(block: => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
+  private def checkPriority(replyTo: ActorRef[StatusReply[State]], state: BoardState, player: PlayerId)(block: => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
     if state.priority == player then
       block
     else
       Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"$player does not have priority"))
 
-  // TODO: Check if player is allowed to play (Wrapper)
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     state match {
       case EmptyState =>
@@ -45,28 +44,38 @@ object Engine {
           case _ => Effect.noReply
         }
 
-      case state: InProgressState =>
+      case state: BoardState =>
         command match {
           case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
 
           case PlayLand(replyTo, player, target) => checkPriority(replyTo, state, player) {
             state.landPlayCheck(player, target) match {
-              case Success(_) => Effect.persist(EnteredTheBattlefield(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+              case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
               case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
             }
           }
 
-          // TODO: Should we add events or persist first ? Maybe having a persist loop until no trigger left
-          case Pass(replyTo, player, times: Option[Int]) => checkPriority(replyTo, state, player) {
-            Effect.persist(
-              (1 to times.getOrElse(1)).foldLeft((state.phase, List.empty[Event])) { case ((phase, events), _) =>
-                val nextPhase = phase.next()
-                (nextPhase, events ++ (Moved(nextPhase) +: nextPhase.turnBasedActions(player)))
-              }._2
-            ).thenReply(replyTo)(state => StatusReply.Success(state))
+          case Next(replyTo, player, times: Option[Int]) => checkPriority(replyTo, state, player) {
+            // TODO: This should be a Step condition
+            if state.stack.isEmpty then
+              // Move phase
+              Effect.persist(
+                (1 to times.getOrElse(1)).foldLeft((state.phase, List.empty[Event])) { case ((phase, events), _) =>
+                  val nextPhase = phase.next()
+                  (nextPhase, events ++ (Moved(nextPhase) +: nextPhase.turnBasedActions(state, player)))
+                }._2
+              ).thenReply(replyTo)(state => StatusReply.Success(state))
+            else
+              // Resolve the stack
+              // TODO: This should probably be a trigger loop for each event
+              Effect.persist(state.stack.flatMap { case (id, spell) => spell.card match {
+                case _: Creature => List(EnteredTheBattlefield(id))
+                case _ => List()
+              }}.toList :+ PriorityPassed(state.playersTurn)).thenReply(replyTo)(state => StatusReply.Success(state))
           }
 
-          case Use(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
+          // TODO: Only none-Mana Abilities go on the Stack
+          case Activate(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
               case Some(spell) =>
                 spell.card.activatedAbilities.get(abilityId) match {
@@ -84,11 +93,11 @@ object Engine {
           case Cast(replyTo, player, target) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.players(player).hand.get(target) match {
               case Some(card) =>
-                // TODO: Should also check speed conditions !!!
+                // TODO: Should also check speed conditions !!! (Sorcery = Main phase, empty stack)
                 // TODO: There can be alternative costs also
                 // TODO: ETB triggers
                 if card.cost.check(state, player) then
-                  Effect.persist(card.cost.pay(target, player) :+ EnteredTheBattlefield(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                  Effect.persist(card.cost.pay(target, player) ++ List(Stacked(target, player), PriorityPassed(state.nextPriority))).thenReply(replyTo)(state => StatusReply.Success(state))
                 else
                   Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
@@ -117,7 +126,7 @@ object Engine {
           case Created(die: Int, players: Map[String, Deck]) =>
             val startingUser = players.keys.toIndexedSeq(die)
 
-            InProgressState(
+            BoardState(
               startingUser,
               startingUser,
               players.map((name, deck) => (name, PlayerState(deck.cards)))
@@ -125,17 +134,15 @@ object Engine {
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }
 
-      case state: InProgressState =>
+      case state: BoardState =>
         event match {
           case Moved(phase) => state.focus(_.phase).replace(phase)
-          case PlayerSwapped =>
-            val nextPlayer = state.players.keys.sliding(2).find(_.head == state.playersTurn).map(_.last).getOrElse(state.players.keys.head)
-            // TODO: Priority should be another Event
-            state.focus(_.playersTurn).replace(nextPlayer).focus(_.priority).replace(nextPlayer)
-
           case TurnStateCleaned => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).turn).replace(TurnState())
           }
+          case TurnEnded =>
+            state.focus(_.playersTurn).replace(state.nextPlayer)
+              .focus(_.priority).replace(state.nextPlayer)
 
           case ManaPoolEmptied => state.players.keys.foldLeft(state) { (state, player) =>
             state.focus(_.players.index(player).manaPool).replace(ManaPool.empty())
@@ -149,12 +156,25 @@ object Engine {
             val shuffled = order.zip(state.players(player).library).sortBy(_._1).map(_._2)
             state.focus(_.players.index(player).library).replace(shuffled)
 
-          case EnteredTheBattlefield(target, player) =>
+          case Stacked(target, player) =>
             val spell = Spell(state.players(player).hand(target), player, player)
-            state.focus(_.battleField).modify(_ + (target -> spell))
+            state.focus(_.stack).modify(_ + (target -> spell))
               .focus(_.players.index(player).hand).modify(_.removed(target))
-              // TODO: Could be more readable ?
-              .focus(_.players.index(player).turn.landsToPlay).modify(_ - (if spell.card.isInstanceOf[LandType] then 1 else 0))
+
+          case PriorityPassed(toPlayer) => state.focus(_.priority).replace(toPlayer)
+
+          case EnteredTheBattlefield(target) =>
+            val spell = state.stack(target)
+            state.focus(_.battleField).modify(_ + (target -> spell))
+              .focus(_.stack).modify(_.removed(target))
+
+          // TODO: Oh no, target can come from the hand or the stack (Or other zones ?)
+          // TODO: Oh no, we can cast from the graveyard also !
+          case LandPlayed(target, player) =>
+            val land = Spell(state.players(player).hand(target), player, player)
+            state.focus(_.battleField).modify(_ + (target -> land))
+              .focus(_.players.index(player).hand).modify(_.removed(target))
+              .focus(_.players.index(player).turn.landsToPlay).modify(_ - 1)
 
           // TODO: Extract some of those focus
           case Drawn(amount, player) =>
