@@ -28,10 +28,7 @@ object CommandLine {
   case object Terminate extends Status
 
   private val terminal: Terminal = TerminalBuilder.terminal
-  private var lineReader: LineReader = LineReaderBuilder.builder()
-    .terminal(terminal)
-    .completer(new StringsCompleter("read", "play", "use", "pass", "cast", "discard", "exit"))
-    .build()
+  private var lineReader: LineReader = LineReaderBuilder.builder().terminal(terminal).build()
 
   def apply(instance: Behavior[Action]): Behavior[Status] =
     Behaviors.setup[CommandLine.Status] { context =>
