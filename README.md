@@ -8,7 +8,5 @@ sbt run
 
 # Next
 
-- End turn conditions (discard)
-- Type condition (canPlayLand, Sorcery speed, instant speed)
 - Extract Focus
 - Tests !

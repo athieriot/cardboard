@@ -20,7 +20,9 @@ final case class New(replyTo: ActorRef[StatusReply[State]], players: Map[String,
 final case class PlayLand(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 final case class Cast(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 final case class Activate(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId, abilityId: Int) extends Action
+
 final case class Next(replyTo: ActorRef[StatusReply[State]], player: PlayerId, times: Option[Int]) extends Action
+final case class EndTurn(replyTo: ActorRef[StatusReply[State]], player: PlayerId) extends Action
 
 final case class Discard(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 

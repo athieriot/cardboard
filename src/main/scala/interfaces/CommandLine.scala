@@ -50,7 +50,7 @@ object CommandLine {
           val forest = Forest("one", 275)
           val llanowarElf = LlanowarElf("m19", 314)
           val standardDeck: Deck = Deck((1 to 30).map(_ => forest).toList ++ (1 to 30).map(_ => llanowarElf))
-          
+
           val playerOne = lineReader.readLine("Player One: ")
           val playerTwo = lineReader.readLine("Player Two: ")
 
@@ -79,6 +79,7 @@ object CommandLine {
               case "activate" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(target), abilityId.toInt))
               case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, None))
               case "next" :: times :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, Some(times.toInt)))
+              case "end" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => EndTurn(ref, priority))
               case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, priority, readIdFromArg(target)))
               case _ => println("I don't understand your action"); context.self ! Ready(priority); None
             }
@@ -126,6 +127,7 @@ object CommandLine {
         if !state.battleField.exists(_._2.owner == state.priority) then node("activate") else node("activate", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2)).toList: _*)),
         node("next"),
+        node("end"),
         node("exit"),
       ))
       .build()

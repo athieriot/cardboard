@@ -3,12 +3,14 @@ package cards
 import game.*
 
 enum Step {
-  // TODO: Should stop if end of turn + EndTurn Command
-  def next(): Step = Step.values.sliding(2).find(_.head == this).map(_.last).getOrElse(unTap)
+  case unTap, upKeep, draw, preCombatMain, beginningOfCombat, declareAttackers, declareBlockers, combatDamage, endOfCombat, postCombatMain, end, cleanup
 
-  private def commonTurnBasedActions(state: BoardState): List[Event] =
-    List(ManaPoolEmptied, PriorityPassed(state.playersTurn))
-  
+  // TODO: Should stop if end of turn + EndTurn Command
+  def next(): Step = Step.values.sliding(2).find(_.head == this).map(_.last)
+    .getOrElse(throw new RuntimeException("Cannot skip end step, please use EndStep Action"))
+
+  def isMain: Boolean = this == preCombatMain || this == postCombatMain
+
   // TODO: Implement Turn Based checks ?
   // TODO: Implement more Turn Based actions
   // TODO: Check conditions for End step, like hand size ?
@@ -20,9 +22,8 @@ enum Step {
     case _ => List()
   }}
 
-  def isMain: Boolean = this == preCombatMain || this == postCombatMain
-
-  case unTap, upKeep, draw, preCombatMain, beginningOfCombat, declareAttackers, declareBlockers, combatDamage, endOfCombat, postCombatMain, end, cleanup
+  private def commonTurnBasedActions(state: BoardState): List[Event] =
+    List(Moved(this), ManaPoolEmptied, PriorityPassed(state.playersTurn))
 }
 
 enum Phase(steps: List[Step]) {

@@ -34,6 +34,7 @@ class LlanowarElf(val set: String, val numberInSet: Int) extends Creature {
   val color: Color = Color.green
   val cost: CastingCost = ManaCost("G")
 
+  // TODO: Effect = ETB
   def activatedAbilities: Map[Int, Ability] = Map(
     1 -> Ability(Tap, "Add one green mana", (_, player) => List(ManaAdded(Map(Color.green -> 1), player)))
   )

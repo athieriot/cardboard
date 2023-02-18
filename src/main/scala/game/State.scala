@@ -12,13 +12,19 @@ import monocle.syntax.all.*
 
 import scala.annotation.targetName
 
-type CardId = Int
+type CardId = Int // TODO: Should include "from"
 type PlayerId = String
+
+enum TargetZone {
+  case hand, stack, graveyard, library, battleField, exile, command
+}
+case class TargetId(id: Int, owner: PlayerId, from: TargetZone)
 
 enum Status {
   case Tapped, Untapped
 }
 
+trait Target
 case class Spell(
   card: Card,
   owner: String,
@@ -61,11 +67,11 @@ case object EmptyState extends State
 case class BoardState(
   playersTurn: String,
   priority: String,
-  players: Map[String, PlayerState],
+  players: Map[String, PlayerState], // TODO: Change String to ID to be able to be a target ?
   currentStep: Step = Step.preCombatMain,
   stack: Map[CardId, Spell] = Map.empty,
   battleField: Map[CardId, Permanent] = Map.empty,
-  highestId: CardId = 5,
+  highestId: CardId = 1,
 ) extends State {
 
   def nextPlayer: String = players.keys.sliding(2).find(_.head == playersTurn).map(_.last).getOrElse(players.keys.head)

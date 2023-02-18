@@ -17,6 +17,7 @@ import scala.util.{Failure, Success, Try}
 object Engine {
 
   private val OPENING_HAND = 7
+  private val MAX_HAND_SIZE = 7
 
   // Should there be a context object ?
   // TODO: Have a wrapper to fetch Target once we have "from" parameter
@@ -63,23 +64,25 @@ object Engine {
           case Next(replyTo, player, times: Option[Int]) => checkPriority(replyTo, state, player) {
             // TODO: This should be a Step condition
             if state.stack.isEmpty then
-              // Move phase
-              Effect.persist(
+              Try {
                 (1 to times.getOrElse(1)).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
                   val nextPhase = phase.next()
-                  (nextPhase, events ++ (Moved(nextPhase) +: nextPhase.turnBasedActions(state, player)))
+                  (nextPhase, events ++ nextPhase.turnBasedActions(state, player))
                 }._2
-              ).thenReply(replyTo)(state => StatusReply.Success(state))
+              } match {
+                case Success(events) => Effect.persist(events).thenReply(replyTo)(state => StatusReply.Success(state))
+                case Failure(ex) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(ex.getLocalizedMessage))
+              }
             else
               // Resolve the stack
               // TODO: This should probably be a trigger loop for each event
-              Effect.persist(state.stack.flatMap { case (id, spell) => spell.card match {
+              Effect.persist(state.stack.toList.reverse.flatMap { case (id, spell) => spell.card match {
                 case _: Creature => List(EnteredTheBattlefield(id))
                 case _ => List()
-              }}.toList :+ PriorityPassed(state.playersTurn)).thenReply(replyTo)(state => StatusReply.Success(state))
+              }} :+ PriorityPassed(state.playersTurn)).thenReply(replyTo)(state => StatusReply.Success(state))
           }
 
-          // TODO: Only none-Mana Abilities go on the Stack
+          // TODO: Only non-Mana Abilities go on the Stack
           case Activate(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
               case Some(spell) =>
@@ -108,10 +111,30 @@ object Engine {
           }
 
           case Discard(replyTo, player, target) => checkPriority(replyTo, state, player) {
-            if state.players(player).hand.contains(target) then
-              Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
-            else
-              Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+            state.players(player).hand.get(target) match {
+              case Some(_) =>
+                (state.currentStep, state.players(player).hand) match {
+                  case (Step.cleanup, hand) if hand.size > MAX_HAND_SIZE =>
+                    Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                  case (Step.cleanup, hand) if hand.size <= MAX_HAND_SIZE =>
+                    Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Hand size does not exceed maximum, you can EndTurn"))
+                  case _ =>
+                    Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Discard only during cleanup step"))
+                }
+
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+            }
+          }
+
+          case EndTurn(replyTo, player) => checkPriority(replyTo, state, player) {
+            (state.currentStep, state.players(player).hand) match {
+              case (Step.cleanup, hand) if hand.size <= MAX_HAND_SIZE =>
+                Effect.persist(Step.unTap.turnBasedActions(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+              case (Step.cleanup, hand) if hand.size > MAX_HAND_SIZE =>
+                Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Maximum hand size exceeded, discard down to 7"))
+              case _ =>
+                Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Pass the turn only during cleanup step"))
+            }
           }
 
           case _ => Effect.noReply

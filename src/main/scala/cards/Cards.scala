@@ -22,6 +22,7 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
   Array(
     new JsonSubTypes.Type(value = classOf[Land], name = "land"),
     new JsonSubTypes.Type(value = classOf[Creature], name = "creature"),
+    new JsonSubTypes.Type(value = classOf[Instant], name = "instant"),
   )
 )
 abstract class Card {
