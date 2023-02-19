@@ -27,17 +27,25 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 )
 abstract class Card {
   val name: String
+  // TODO: Enum ?
   val subTypes: List[String]
   val color: Color
   // TODO: Some cards have no mana cost (Ex: Suspend)
   val cost: CastingCost
   val set: String // TODO: Could be an enum
   val numberInSet: Int
-  
+
   def activatedAbilities: Map[Int, Ability]
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit]
-  
+
+  // TODO: Or has toughness
+  def isCreature: Boolean = {
+    isInstanceOf[Creature] || subTypes.contains("Creature") || subTypes.contains("Legendary Creature")
+  }
+
   def preview: URL = {
     new URL(s"https://scryfall.com/card/$set/$numberInSet/${name.replace("-", "").toLowerCase}")
   }
 }
+
+abstract class PermanentCard extends Card

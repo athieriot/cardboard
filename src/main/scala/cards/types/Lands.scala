@@ -15,15 +15,15 @@ import scala.util.Try
     new JsonSubTypes.Type(value = classOf[BasicLand], name = "basicLand"),
   )
 )
-sealed abstract class Land extends Card {
+sealed abstract class Land extends PermanentCard {
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {
-    if state.playersTurn != player then
+    if state.currentPlayer != player then
       throw new RuntimeException("You can only play lands during your turn")
     else if !state.currentStep.isMain then
       throw new RuntimeException("You can only play lands during a main phase")
     else if state.stack.nonEmpty then
       throw new RuntimeException("You can only play lands when the stack is empty")
-    else if state.players(player).turn.landsToPlay <= 0 then
+    else if state.players(player).landsToPlay <= 0 then
       throw new RuntimeException("You already played a land this turn")
   }
 }

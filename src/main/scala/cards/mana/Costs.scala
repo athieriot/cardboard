@@ -9,11 +9,15 @@ case class Ability(cost: AbilityCost, text: String, effect: (BoardState, String)
 
 trait AbilityCost {
   // TODO: Feel like the target should be on the Ability instance
-  def canPay(target: Permanent): Boolean
+  def canPay(target: Card|Permanent[PermanentCard]): Boolean
   def pay(target: CardId, player: PlayerId): List[Event]
 }
 case object Tap extends AbilityCost {
-  def canPay(target: Permanent): Boolean = target.status == Status.Untapped
+  // TODO: Also it could probably return a Try instead to return more precise messages
+  def canPay(target: Card|Permanent[PermanentCard]): Boolean = target match {
+    case permanent: Permanent[PermanentCard] => permanent.status == Status.Untapped && !permanent.hasSummoningSickness
+    case _ => false
+  }
   def pay(target: CardId, player: PlayerId): List[Event] = List(Tapped(target))
 }
 

@@ -47,7 +47,7 @@ object CommandLine {
           })
 
         case Prepare =>
-          val forest = Forest("one", 275)
+          val forest = Forest("one", 276)
           val llanowarElf = LlanowarElf("m19", 314)
           val standardDeck: Deck = Deck((1 to 30).map(_ => forest).toList ++ (1 to 30).map(_ => llanowarElf))
 
@@ -76,6 +76,7 @@ object CommandLine {
               case "read" :: _ :: Nil => Some(Recover.apply)
               case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, priority, readIdFromArg(target)))
               case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, priority, readIdFromArg(target)))
+              case "attack" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareAttacker(ref, priority, readIdFromArg(target)))
               case "activate" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(target), abilityId.toInt))
               case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, None))
               case "next" :: times :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, Some(times.toInt)))
@@ -123,7 +124,8 @@ object CommandLine {
       .completer(new TreeCompleter(
         node("read", node(collection.map(c => renderArg(c._1, c._2)).toList: _*)),
         node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
-        node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        if state.players(state.priority).hand.forall(_._2.isInstanceOf[Land]) then node("cast") else node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        if state.potentialAttackers(state.priority).isEmpty then node("attack") else node("attack", node(state.potentialAttackers(state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         if !state.battleField.exists(_._2.owner == state.priority) then node("activate") else node("activate", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2)).toList: _*)),
         node("next"),
@@ -141,15 +143,17 @@ object CommandLine {
     val playerTwo = state.players.last
     renderPlayer(state, playerOne._1, playerOne._2)
 
-    // TODO: Display summoning sickness
-    // TODO: Show each types (Creatures, Artefacts, Enchantments, Planeswalkers) on a different line
+    // TODO: Show each types (Artefacts, Enchantments, Planeswalkers) on a different line
     println(s"| ✋ Hand (${playerOne._2.hand.size}): ${playerOne._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
     println("|------------------")
-    println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerOne._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
+    println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println("|")
     if state.stack.nonEmpty then println(s"| 🎴Stack: ${state.stack.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
+    if state.combat.attackers.nonEmpty then println(s"| 🎴Attackers: ${state.combat.attackers.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
     println("|")
-    println(s"| 🌳Lands: ${state.battleField.filter(_._2.owner == playerTwo._1).map(p => s"${renderName(p._1, p._2.card)}[${if p._2.status == Status.Untapped then " " else "T"}]").mkString(", ")}")
+    println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
+    println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
     println("|------------------")
     println(s"| ✋ Hand (${playerTwo._2.hand.size}): ${playerTwo._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
 
@@ -161,20 +165,22 @@ object CommandLine {
   }
 
   private def renderPlayer(state: BoardState, name: String, playerState: PlayerState): Unit = {
-    val active = if state.playersTurn == name then "⭐ " else ""
+    val active = if state.currentPlayer == name then "⭐ " else ""
     val priority = if state.priority == name then " 🟢" else ""
 
     println("|------------------")
     println(s"| Player: $active$name$priority - Life: ${playerState.life}")
-    println(s"| 📚Library: ${playerState.library.size}")
-    println(s"| 🪦Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2)).mkString(", ")}")
-    println(s"| 🪄Mana: ${playerState.manaPool.pool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")
+    println(s"| 📚 Library: ${playerState.library.size}")
+    println(s"| 🪦  Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| 🪄  Mana: ${playerState.manaPool.pool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")
     println("|------------------")
   }
 
   def renderArg(id: CardId, card: Card): String = s"${card.name.replace(" ", "_")}[$id]"
   def readIdFromArg(name: String): CardId = name.split("[\\[\\]]").last.toInt
   def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
+  def renderStatus(permanent: Permanent[PermanentCard]): String = if permanent.status == Status.Tapped then "[T]" else ""
+  def renderSummoningSickness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature && permanent.hasSummoningSickness then "[S]" else ""
 
   def renderCard(state: BoardState, target: CardId): Unit = {
     val collection: Map[CardId, Card] = state.battleField.view.mapValues(_.card).toMap ++ state.stack.view.mapValues(_.card).toMap
@@ -198,8 +204,8 @@ object CommandLine {
   private def terminalColor(c: Color, text: String): String = c match {
     case Color.red => s"${Console.RED}$text${Console.RESET}"
     case Color.green => s"${Console.GREEN}$text${Console.RESET}"
-    case Color.white => s"${Console.WHITE}$text${Console.RESET}"
-    case Color.black => s"${Console.BLACK}$text${Console.RESET}"
+    case Color.white => s"${Console.WHITE}${Console.BLACK_B}$text${Console.RESET}"
+    case Color.black => s"${Console.BLACK}${Console.WHITE_B}$text${Console.RESET}"
     case Color.blue => s"${Console.BLUE}$text${Console.RESET}"
     case Color.none => s"${Console.YELLOW}$text${Console.RESET}"
   }

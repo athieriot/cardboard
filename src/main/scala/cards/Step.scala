@@ -15,15 +15,13 @@ enum Step {
   // TODO: Implement more Turn Based actions
   // TODO: Check conditions for End step, like hand size ?
   // TODO: Should have Before/After triggers for times when there are multiple steps of the same type
-  def turnBasedActions(state: BoardState, player: PlayerId): List[Event] = commonTurnBasedActions(state) ++ { this match {
+  def turnBasedActions(player: PlayerId): List[Event] = MovedToStep(this) +: { this match {
     case Step.unTap => List(TurnEnded, Untapped)
     case Step.draw => List(Drawn(1, player))
-    case Step.cleanup => List(TurnStateCleaned)
+    // TODO: declareBlockers => Pass priority to opponent if attackers, otherwise pass to endOfCombat automatically
+    case Step.endOfCombat => List(CombatStateCleaned)
     case _ => List()
   }}
-
-  private def commonTurnBasedActions(state: BoardState): List[Event] =
-    List(Moved(this), ManaPoolEmptied, PriorityPassed(state.playersTurn))
 }
 
 enum Phase(steps: List[Step]) {

@@ -21,6 +21,8 @@ final case class PlayLand(replyTo: ActorRef[StatusReply[State]], player: PlayerI
 final case class Cast(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 final case class Activate(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId, abilityId: Int) extends Action
 
+final case class DeclareAttacker(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
+
 final case class Next(replyTo: ActorRef[StatusReply[State]], player: PlayerId, times: Option[Int]) extends Action
 final case class EndTurn(replyTo: ActorRef[StatusReply[State]], player: PlayerId) extends Action
 
@@ -35,11 +37,10 @@ sealed trait Event
 final case class Created(die: Int, players: Map[String, Deck]) extends Event
 
 sealed trait StateBaseEvent extends Event
-final case class Moved(phase: Step) extends StateBaseEvent
+final case class MovedToStep(phase: Step) extends StateBaseEvent
 case object TurnEnded extends StateBaseEvent
-case object ManaPoolEmptied extends StateBaseEvent
 case object Untapped extends StateBaseEvent
-case object TurnStateCleaned extends StateBaseEvent
+case object CombatStateCleaned extends StateBaseEvent
 final case class PriorityPassed(to: PlayerId) extends Event
 
 // TODO: Maybe we should have a "from" parameter
@@ -50,6 +51,8 @@ final case class EnteredTheBattlefield(target: CardId) extends Event
 final case class Tapped(target: CardId) extends Event
 final case class ManaAdded(mana: Map[Color, Int], player: PlayerId) extends Event
 final case class ManaPaid(cost: ManaCost, player: PlayerId) extends Event
+
+final case class AttackerDeclared(attacker: CardId) extends Event
 
 final case class Drawn(amount: Int, player: PlayerId) extends Event
 final case class Shuffled(order: List[Int], player: PlayerId) extends Event

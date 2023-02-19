@@ -15,9 +15,9 @@ import scala.util.Try
     new JsonSubTypes.Type(value = classOf[LlanowarElf], name = "LlanowarElf"),
   )
 )
-sealed abstract class Creature extends Card {
+sealed abstract class Creature extends PermanentCard {
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {
-    if state.playersTurn != player then
+    if state.currentPlayer != player then
       throw new RuntimeException("You can only play creatures during your turn")
     else if !state.currentStep.isMain then
       throw new RuntimeException("You can only play creatures during a main phase")
