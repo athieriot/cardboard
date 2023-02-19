@@ -94,6 +94,7 @@ object Engine {
             }
           }
 
+          // TODO: No need to protect against priority but active player
           case DeclareAttacker(replyTo, player, target) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.declareAttackers) {
             state.potentialAttackers(player).get(target) match {
               case Some(_) =>
@@ -102,6 +103,7 @@ object Engine {
             }
           }}
 
+          // TODO: No need to protect against priority but active player
           // TODO: Multiple blockers
           case DeclareBlocker(replyTo, player, target, blocker) => checkPriority(replyTo, state, player) {
             checkStep(replyTo, state, Step.declareBlockers) {
@@ -117,6 +119,7 @@ object Engine {
           }
 
           // TODO: Apparently there is a round of priority after declare attacker/blockers
+          // TODO: Need to find a way to do that round of priority each step
           case Next(replyTo, player, skip: Option[Boolean]) => checkPriority(replyTo, state, player) {
             val stepsCountUntilEnd = skip.filter(_ == true).map(_ => Step.values.length - Step.values.indexOf(state.currentStep) - 1).getOrElse(1)
 
@@ -138,7 +141,7 @@ object Engine {
                 case _ => List()
               }
               // TODO: Careful ! That will not work during DeclareBlockers step where opponent
-              } :+ PriorityPassed(state.currentPlayer)).thenReply(replyTo)(state => StatusReply.Success(state))
+              } :+ PriorityPassed(state.activePlayer)).thenReply(replyTo)(state => StatusReply.Success(state))
           }
           case Discard(replyTo, player, target) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.cleanup) {
             state.players(player).hand.get(target) match {
@@ -195,14 +198,14 @@ object Engine {
             state.players.keys.foldLeft(state) { (state, player) =>
               state.focus(_.players.index(player).manaPool).replace(ManaPool.empty())
             }
-              .focus(_.currentStep).replace(phase).focus(_.priority).replace(state.currentPlayer)
+              .focus(_.currentStep).replace(phase).focus(_.priority).replace(state.activePlayer)
 
           case CombatEnded => state.focus(_.combat).replace(CombatState())
           case TurnEnded =>
             state.players.keys.foldLeft(state) { (state, player) =>
               state.focus(_.players.index(player).landsToPlay).replace(1)
             }
-              .focus(_.currentPlayer).replace(state.nextPlayer)
+              .focus(_.activePlayer).replace(state.nextPlayer)
               .focus(_.priority).replace(state.nextPlayer)
               .focus(_.battleField).modify(_.map(p => (p._1, p._2.copy(firstTurn = false))))
 

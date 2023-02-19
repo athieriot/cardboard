@@ -163,7 +163,7 @@ object CommandLine {
   }
 
   private def renderPlayer(state: BoardState, name: String, playerState: PlayerState): Unit = {
-    val active = if state.currentPlayer == name then "⭐ " else ""
+    val active = if state.activePlayer == name then "⭐ " else ""
     val priority = if state.priority == name then " 🟢" else ""
 
     println("|------------------")

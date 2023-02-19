@@ -41,17 +41,17 @@ case object EmptyState extends State
 // TODO: State = Number of Mulligan
 // TODO: State = Number of Turns
 case class BoardState(
-  currentPlayer: String,
-  priority: String,
-  players: Map[String, PlayerState], // TODO: Change String to ID to be able to be a target ?
-  currentStep: Step = Step.preCombatMain,
-  stack: Map[CardId, Spell[Card]] = Map.empty,
-  battleField: Map[CardId, Permanent[PermanentCard]] = Map.empty,
-  combat: CombatState = CombatState(),
-  highestId: CardId = 1,
+   activePlayer: String,
+   priority: String,
+   players: Map[String, PlayerState], // TODO: Change String to ID to be able to be a target ?
+   currentStep: Step = Step.preCombatMain,
+   stack: Map[CardId, Spell[Card]] = Map.empty,
+   battleField: Map[CardId, Permanent[PermanentCard]] = Map.empty,
+   combat: CombatState = CombatState(),
+   highestId: CardId = 1,
 ) extends State {
 
-  def nextPlayer: String = players.keys.sliding(2).find(_.head == currentPlayer).map(_.last).getOrElse(players.keys.head)
+  def nextPlayer: String = players.keys.sliding(2).find(_.head == activePlayer).map(_.last).getOrElse(players.keys.head)
   def nextPriority: String = players.keys.sliding(2).find(_.head == priority).map(_.last).getOrElse(players.keys.head)
   
 //  def getFrom(zone: Zone, id: CardId, player: PlayerId): Card = zone match {

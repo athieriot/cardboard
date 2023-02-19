@@ -17,7 +17,7 @@ import scala.util.Try
 )
 sealed abstract class Creature extends PermanentCard {
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {
-    if state.currentPlayer != player then
+    if state.activePlayer != player then
       throw new RuntimeException("You can only play creatures during your turn")
     else if !state.currentStep.isMain then
       throw new RuntimeException("You can only play creatures during a main phase")
