@@ -102,14 +102,29 @@ object Engine {
             }
           }}
 
+          // TODO: Multiple blockers
+          case DeclareBlocker(replyTo, player, target, blocker) => checkPriority(replyTo, state, player) {
+            checkStep(replyTo, state, Step.declareBlockers) {
+              state.potentialBlockers(player).get(blocker) match {
+                case Some(_) =>
+                  state.combat.attackers.get(target) match {
+                    case Some(_) => Effect.persist(BlockerDeclared(target, blocker)).thenReply(replyTo)(state => StatusReply.Success(state))
+                    case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
+                  }
+                case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+              }
+            }
+          }
+
+          // TODO: Apparently there is a round of priority after declare attacker/blockers
           case Next(replyTo, player, skip: Option[Boolean]) => checkPriority(replyTo, state, player) {
-            val stepsCountUntilEnd = skip.filter(_ == true).map(_ => Step.values.length - Step.values.indexOf(state.currentStep)).getOrElse(1)
+            val stepsCountUntilEnd = skip.filter(_ == true).map(_ => Step.values.length - Step.values.indexOf(state.currentStep) - 1).getOrElse(1)
 
             if state.stack.isEmpty then
               Try {
-                (1 until stepsCountUntilEnd).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
+                (1 to stepsCountUntilEnd).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
                   val nextPhase = phase.next()
-                  (nextPhase, events ++ nextPhase.turnBasedActions(player))
+                  (nextPhase, events ++ nextPhase.turnBasedActions(state, player))
                 }._2
               } match {
                 case Success(events) => Effect.persist(events).thenReply(replyTo)(state => StatusReply.Success(state))
@@ -140,7 +155,7 @@ object Engine {
           case EndTurn(replyTo, player) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.cleanup) {
             state.players(player).hand match {
               case hand if hand.size <= MAX_HAND_SIZE =>
-                Effect.persist(Step.unTap.turnBasedActions(player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                Effect.persist(Step.unTap.turnBasedActions(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
               case hand if hand.size > MAX_HAND_SIZE =>
                 Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Maximum hand size exceeded, discard down to 7"))
             }
@@ -221,6 +236,13 @@ object Engine {
             state.battleField.get(target) match {
               case Some(permanent) => state.focus(_.combat.attackers).modify(_ + (target -> permanent))
               case None => state
+            }
+
+            // TODO: Naming !
+          case BlockerDeclared(target, blocker) =>
+            (state.combat.attackers.get(target), state.battleField.get(blocker)) match {
+              case (Some(_), Some(card)) => state.focus(_.combat.blockers).modify(_ + (target -> List((blocker, card))))
+              case _ => state
             }
 
           // TODO: Extract some of those focus

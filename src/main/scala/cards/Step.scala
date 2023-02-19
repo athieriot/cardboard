@@ -12,10 +12,11 @@ enum Step {
 
   // TODO: Implement more Turn Based actions
   // TODO: Should have Before/After triggers for times when there are multiple steps of the same type
-  def turnBasedActions(player: PlayerId): List[Event] = MovedToStep(this) +: { this match {
+  def turnBasedActions(state: BoardState, player: PlayerId): List[Event] = MovedToStep(this) +: { this match {
     case Step.unTap => List(TurnEnded, Untapped)
     case Step.draw => List(Drawn(1, player))
     // TODO: declareBlockers => Pass priority to opponent if attackers, otherwise pass to endOfCombat automatically
+    case Step.declareBlockers => if state.combat.attackers.isEmpty then List(MovedToStep(Step.endOfCombat)) else List(PriorityPassed(state.nextPriority))
     case Step.endOfCombat => List(CombatEnded)
     case _ => List()
   }}

@@ -53,4 +53,5 @@ class Forest(val set: MagicSet, val numberInSet: Int) extends BasicLand {
   val subTypes: List[String] = List("Basic Land", "Forest")
   val cost: CastingCost = ManaCost("G")
   val colorProduced: Color = Color.green
+  val basePowerToughness: Option[(Int, Int)] = None
 }

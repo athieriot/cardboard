@@ -69,4 +69,6 @@ abstract class Card {
   }
 }
 
-abstract class PermanentCard extends Card
+abstract class PermanentCard extends Card {
+  val basePowerToughness: Option[(Int, Int)]
+}

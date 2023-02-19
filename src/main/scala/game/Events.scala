@@ -22,6 +22,7 @@ final case class Cast(replyTo: ActorRef[StatusReply[State]], player: PlayerId, t
 final case class Activate(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId, abilityId: Int) extends Action
 
 final case class DeclareAttacker(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
+final case class DeclareBlocker(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId, blocker: CardId) extends Action
 
 final case class Next(replyTo: ActorRef[StatusReply[State]], player: PlayerId, skip: Option[Boolean]) extends Action
 final case class EndTurn(replyTo: ActorRef[StatusReply[State]], player: PlayerId) extends Action
@@ -53,6 +54,7 @@ final case class ManaAdded(mana: Map[Color, Int], player: PlayerId) extends Even
 final case class ManaPaid(cost: ManaCost, player: PlayerId) extends Event
 
 final case class AttackerDeclared(attacker: CardId) extends Event
+final case class BlockerDeclared(target: CardId, blocker: CardId) extends Event
 
 final case class Drawn(amount: Int, player: PlayerId) extends Event
 final case class Shuffled(order: List[Int], player: PlayerId) extends Event

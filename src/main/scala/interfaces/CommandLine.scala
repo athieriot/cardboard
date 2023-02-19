@@ -73,6 +73,7 @@ object CommandLine {
               case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, priority, readIdFromArg(target)))
               case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, priority, readIdFromArg(target)))
               case "attack" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareAttacker(ref, priority, readIdFromArg(target)))
+              case "block" :: target :: block :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareBlocker(ref, priority, readIdFromArg(target), readIdFromArg(block)))
               case "activate" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(target), abilityId.toInt))
               case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, None))
               case "next" :: "skip" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, Some(true)))
@@ -119,9 +120,10 @@ object CommandLine {
       .terminal(terminal)
       .completer(new TreeCompleter(
         node("read", node(collection.map(c => renderArg(c._1, c._2)).toList: _*)),
-        node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        if !state.players(state.priority).hand.exists(_._2.isInstanceOf[Land]) then node("play") else node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
         if state.players(state.priority).hand.forall(_._2.isInstanceOf[Land]) then node("cast") else node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
         if state.potentialAttackers(state.priority).isEmpty then node("attack") else node("attack", node(state.potentialAttackers(state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
+        // TODO: TreeCompleter for blockers
         if !state.battleField.exists(_._2.owner == state.priority) then node("activate") else node("activate", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2)).toList: _*)),
         node("next"),
@@ -146,7 +148,7 @@ object CommandLine {
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println("|")
     if state.stack.nonEmpty then println(s"| 🎴Stack: ${state.stack.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
-    if state.combat.attackers.nonEmpty then println(s"| 🎴Attackers: ${state.combat.attackers.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
+    if state.combat.attackers.nonEmpty then println(s"| ⚠ Attack: ${state.combat.attackers.map(p => s"${renderName(p._1, p._2.card)}->${state.combat.blockers.get(p._1).map(b => renderName(b.head._1, b.head._2.card)).getOrElse(state.nextPlayer)}").mkString(", ")}")
     println("|")
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")

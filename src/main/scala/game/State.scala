@@ -32,7 +32,7 @@ case class PlayerState(
 )
 case class CombatState(
   attackers: Map[CardId, Permanent[PermanentCard]] = Map.empty,
-  blockers: Map[CardId, Permanent[PermanentCard]] = Map.empty,
+  blockers: Map[CardId, List[(CardId, Permanent[PermanentCard])]] = Map.empty,
 )
 
 trait State
@@ -53,11 +53,25 @@ case class BoardState(
 
   def nextPlayer: String = players.keys.sliding(2).find(_.head == currentPlayer).map(_.last).getOrElse(players.keys.head)
   def nextPriority: String = players.keys.sliding(2).find(_.head == priority).map(_.last).getOrElse(players.keys.head)
-
+  
+//  def getFrom(zone: Zone, id: CardId, player: PlayerId): Card = zone match {
+//    case 
+//  }
+    
+  
   // TODO: Will need to add more restrictions
   def potentialAttackers(player: PlayerId): Map[CardId, Permanent[PermanentCard]] = battleField
     .filter(_._2.controller == player)
     .filter(_._2.card.isCreature)
     .filter(_._2.status == Status.Untapped)
     .filterNot(_._2.hasSummoningSickness)
+
+  def potentialBlockers(player: PlayerId): Map[CardId, Permanent[PermanentCard]] = battleField
+    .filter(_._2.controller == player)
+    .filter(_._2.card.isCreature)
+    .filter(_._2.status == Status.Untapped)
+}
+
+enum Zone {
+  case hand, stack, graveyard, library, battleField, exile, command
 }
