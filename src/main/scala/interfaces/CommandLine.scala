@@ -75,7 +75,7 @@ object CommandLine {
               case "attack" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareAttacker(ref, priority, readIdFromArg(target)))
               case "activate" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(target), abilityId.toInt))
               case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, None))
-              case "next" :: times :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, Some(times.toInt)))
+              case "next" :: "skip" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, Some(true)))
               case "end" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => EndTurn(ref, priority))
               case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, priority, readIdFromArg(target)))
               case _ => println("I don't understand your action"); context.self ! Ready(priority); None

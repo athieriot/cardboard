@@ -102,11 +102,12 @@ object Engine {
             }
           }}
 
-          // TODO: Instead of number, take the last step we want to stop to
-          case Next(replyTo, player, times: Option[Int]) => checkPriority(replyTo, state, player) {
+          case Next(replyTo, player, skip: Option[Boolean]) => checkPriority(replyTo, state, player) {
+            val stepsCountUntilEnd = skip.filter(_ == true).map(_ => Step.values.length - Step.values.indexOf(state.currentStep)).getOrElse(1)
+
             if state.stack.isEmpty then
               Try {
-                (1 to times.getOrElse(1)).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
+                (1 until stepsCountUntilEnd).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
                   val nextPhase = phase.next()
                   (nextPhase, events ++ nextPhase.turnBasedActions(player))
                 }._2

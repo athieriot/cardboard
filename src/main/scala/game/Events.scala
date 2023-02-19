@@ -23,7 +23,7 @@ final case class Activate(replyTo: ActorRef[StatusReply[State]], player: PlayerI
 
 final case class DeclareAttacker(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
 
-final case class Next(replyTo: ActorRef[StatusReply[State]], player: PlayerId, times: Option[Int]) extends Action
+final case class Next(replyTo: ActorRef[StatusReply[State]], player: PlayerId, skip: Option[Boolean]) extends Action
 final case class EndTurn(replyTo: ActorRef[StatusReply[State]], player: PlayerId) extends Action
 
 final case class Discard(replyTo: ActorRef[StatusReply[State]], player: PlayerId, target: CardId) extends Action
