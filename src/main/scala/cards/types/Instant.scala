@@ -19,7 +19,7 @@ sealed abstract class Instant extends Card {
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {}
 }
 
-class Intervene(val set: String, val numberInSet: Int) extends Instant {
+class Intervene(val set: MagicSet, val numberInSet: Int) extends Instant {
   val name: String = "Intervene"
   val subTypes: List[String] = List("Instant")
   val color: Color = Color.blue

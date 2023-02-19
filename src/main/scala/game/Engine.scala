@@ -77,6 +77,7 @@ object Engine {
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
           }
+          // TODO: Put Abilities on the Stack
           // TODO: Only non-Mana Abilities go on the Stack
           case Activate(replyTo, player, target, abilityId) => checkPriority(replyTo, state, player) { // Player Wrapper
             state.battleField.filter(_._2.owner == player).get(target) match {
@@ -101,10 +102,8 @@ object Engine {
             }
           }}
 
-
           // TODO: Instead of number, take the last step we want to stop to
           case Next(replyTo, player, times: Option[Int]) => checkPriority(replyTo, state, player) {
-            // TODO: This should be a Step condition
             if state.stack.isEmpty then
               Try {
                 (1 to times.getOrElse(1)).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
@@ -182,7 +181,7 @@ object Engine {
             }
               .focus(_.currentStep).replace(phase).focus(_.priority).replace(state.currentPlayer)
 
-          case CombatStateCleaned => state.focus(_.combat).replace(CombatState())
+          case CombatEnded => state.focus(_.combat).replace(CombatState())
           case TurnEnded =>
             state.players.keys.foldLeft(state) { (state, player) =>
               state.focus(_.players.index(player).landsToPlay).replace(1)

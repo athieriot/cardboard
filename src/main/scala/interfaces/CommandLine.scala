@@ -47,10 +47,6 @@ object CommandLine {
           })
 
         case Prepare =>
-          val forest = Forest("one", 276)
-          val llanowarElf = LlanowarElf("m19", 314)
-          val standardDeck: Deck = Deck((1 to 30).map(_ => forest).toList ++ (1 to 30).map(_ => llanowarElf))
-
           val playerOne = lineReader.readLine("Player One: ")
           val playerTwo = lineReader.readLine("Player Two: ")
 

@@ -5,7 +5,11 @@ import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 
 // TODO: Could also have a "condition"
-case class Ability(cost: AbilityCost, text: String, effect: (BoardState, String) => List[Event])
+case class Ability(
+  cost: AbilityCost,
+  text: String,
+  effect: (BoardState, String) => List[Event]
+)
 
 trait AbilityCost {
   // TODO: Feel like the target should be on the Ability instance

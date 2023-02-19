@@ -10,11 +10,33 @@ import cards.types.*
 import java.net.URL
 import scala.util.Try
 
-case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
+enum Status {
+  case Tapped, Untapped
+}
 
-  private val MIN_DECK_SIZE = 60
+case class Spell[T <: Card](
+  card: T,
+  owner: String,
+  controller: String,
+)
 
-  def isValid: Boolean = cards.length >= MIN_DECK_SIZE
+case class Permanent[T <: PermanentCard](
+  card: T,
+  owner: String,
+  controller: String,
+  status: Status = Status.Untapped,
+  firstTurn: Boolean = true
+) {
+  // TODO: Check for Haste
+  def hasSummoningSickness: Boolean = card.isCreature && firstTurn
+
+  def tap: Permanent[T] = {
+    this.copy(status = Status.Tapped)
+  }
+
+  def unTap: Permanent[T] = {
+    this.copy(status = Status.Untapped)
+  }
 }
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
@@ -27,24 +49,23 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 )
 abstract class Card {
   val name: String
-  // TODO: Enum ?
   val subTypes: List[String]
   val color: Color
   // TODO: Some cards have no mana cost (Ex: Suspend)
   val cost: CastingCost
-  val set: String // TODO: Could be an enum
+  val set: MagicSet
   val numberInSet: Int
 
   def activatedAbilities: Map[Int, Ability]
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit]
 
-  // TODO: Or has toughness
+  // TODO: Or has toughness ?
   def isCreature: Boolean = {
     isInstanceOf[Creature] || subTypes.contains("Creature") || subTypes.contains("Legendary Creature")
   }
 
   def preview: URL = {
-    new URL(s"https://scryfall.com/card/$set/$numberInSet/${name.replace("-", "").toLowerCase}")
+    new URL(s"https://scryfall.com/card/${set.code}/$numberInSet/${name.replace("-", "").toLowerCase}")
   }
 }
 

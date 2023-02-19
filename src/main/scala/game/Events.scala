@@ -38,10 +38,10 @@ final case class Created(die: Int, players: Map[String, Deck]) extends Event
 
 sealed trait StateBaseEvent extends Event
 final case class MovedToStep(phase: Step) extends StateBaseEvent
+final case class PriorityPassed(to: PlayerId) extends Event
 case object TurnEnded extends StateBaseEvent
 case object Untapped extends StateBaseEvent
-case object CombatStateCleaned extends StateBaseEvent
-final case class PriorityPassed(to: PlayerId) extends Event
+case object CombatEnded extends StateBaseEvent
 
 // TODO: Maybe we should have a "from" parameter
 final case class Stacked(target: CardId, player: PlayerId) extends Event

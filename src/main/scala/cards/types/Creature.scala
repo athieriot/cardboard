@@ -28,7 +28,7 @@ sealed abstract class Creature extends PermanentCard {
   }
 }
 
-class LlanowarElf(val set: String, val numberInSet: Int) extends Creature {
+class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val name: String = "Llanowar Elf"
   val subTypes: List[String] = List("Creature", "Elf Druid")
   val color: Color = Color.green

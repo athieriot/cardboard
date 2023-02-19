@@ -3,7 +3,7 @@ package game
 import cards.*
 import cards.mana.ManaPool
 import cards.types.*
-import game.Status.Untapped
+import game.*
 
 import java.util.UUID
 import scala.collection.mutable
@@ -12,42 +12,13 @@ import monocle.syntax.all.*
 
 import scala.annotation.targetName
 
-type CardId = Int // TODO: Should include "from"
+type CardId = Int
 type PlayerId = String
 
 //enum TargetZone {
 //  case hand, stack, graveyard, library, battleField, exile, command
 //}
 //case class TargetId(id: Int, owner: PlayerId, from: TargetZone)
-
-enum Status {
-  case Tapped, Untapped
-}
-
-case class Spell[T <: Card](
-  card: T,
-  owner: String,
-  controller: String,
-)
-
-case class Permanent[T <: PermanentCard](
-  card: T,
-  owner: String,
-  controller: String,
-  status: Status = Untapped,
-  firstTurn: Boolean = true
-) {
-  // TODO: Check for Haste
-  def hasSummoningSickness: Boolean = card.isCreature && firstTurn
-
-  def tap: Permanent[T] = {
-    this.copy(status = Status.Tapped)
-  }
-
-  def unTap: Permanent[T] = {
-    this.copy(status = Status.Untapped)
-  }
-}
 
 case class PlayerState(
   library: List[Card] = List.empty,

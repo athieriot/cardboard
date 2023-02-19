@@ -48,7 +48,7 @@ sealed abstract class BasicLand extends Land {
   )
 }
 
-class Forest(val set: String, val numberInSet: Int) extends BasicLand {
+class Forest(val set: MagicSet, val numberInSet: Int) extends BasicLand {
   val name: String = "Forest"
   val subTypes: List[String] = List("Basic Land", "Forest")
   val cost: CastingCost = ManaCost("G")
