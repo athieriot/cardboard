@@ -46,7 +46,7 @@ object Engine {
               def randomOrder(n: Int) = scala.util.Random.shuffle(1 to n*2).toList
 
               Effect.persist(
-                List(Created(scala.util.Random.nextInt(players.size), players))
+                List(GameCreated(scala.util.Random.nextInt(players.size), players))
                   ++ players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }
                   ++ players.keys.map(Drawn(OPENING_HAND, _))
               ).thenReply(replyTo)(state => StatusReply.Success(state))
@@ -104,10 +104,11 @@ object Engine {
             }
           }}
 
-          // TODO: No need to protect against priority but active player
           // TODO: Multiple blockers
-          case DeclareBlocker(replyTo, player, target, blocker) => checkPriority(replyTo, state, player) {
-            checkStep(replyTo, state, Step.declareBlockers) {
+          case DeclareBlocker(replyTo, player, target, blocker) => checkStep(replyTo, state, Step.declareBlockers) {
+            if player == state.activePlayer then
+              Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Active player cannot declare blockers"))
+            else
               state.potentialBlockers(player).get(blocker) match {
                 case Some(_) =>
                   state.combatZone.get(target) match {
@@ -116,7 +117,6 @@ object Engine {
                   }
                 case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
               }
-            }
           }
 
           // TODO: Apparently there is a round of priority after declare attacker/blockers
@@ -140,9 +140,7 @@ object Engine {
               Effect.persist(state.stack.toList.reverse.flatMap { case (id, spell) => spell.card match {
                 case _: Creature => List(EnteredTheBattlefield(id))
                 case _ => List()
-              }
-              // TODO: Careful ! That will not work during DeclareBlockers step where opponent
-              } :+ PriorityPassed(state.activePlayer)).thenReply(replyTo)(state => StatusReply.Success(state))
+              }} :+ PriorityPassed(state.activePlayer)).thenReply(replyTo)(state => StatusReply.Success(state))
           }
           case Discard(replyTo, player, target) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.cleanup) {
             state.players(player).hand.get(target) match {
@@ -177,7 +175,7 @@ object Engine {
     state match {
       case EmptyState =>
         event match {
-          case Created(die: Int, players: Map[String, Deck]) =>
+          case GameCreated(die: Int, players: Map[String, Deck]) =>
             val startingUser = players.keys.toIndexedSeq(die)
 
             BoardState(
@@ -194,12 +192,11 @@ object Engine {
             val shuffled = order.zip(state.players(player).library).sortBy(_._1).map(_._2)
             state.focus(_.players.index(player).library).replace(shuffled)
 
-          case PriorityPassed(toPlayer) => state.focus(_.priority).replace(toPlayer)
           case MovedToStep(phase) =>
             state.players.keys.foldLeft(state) { (state, player) =>
               state.focus(_.players.index(player).manaPool).replace(ManaPool.empty())
-            }
-              .focus(_.currentStep).replace(phase).focus(_.priority).replace(state.activePlayer)
+            }.focus(_.currentStep).replace(phase)
+          case PriorityPassed(toPlayer) => state.focus(_.priority).replace(toPlayer)
 
           case CombatEnded => state.focus(_.combatZone).replace(Map.empty)
           case TurnEnded =>
@@ -267,16 +264,27 @@ object Engine {
 
           case Discarded(target, player) =>
             if state.players(player).hand.contains(target) then
-              state.focus(_.players.index(player).graveyard).modify(_ + (target -> state.players (player).hand(target)))
+              state.focus(_.players.index(player).graveyard).modify(_ + (target -> state.players(player).hand(target)))
                 .focus(_.players.index (player).hand).modify(_.removed (target))
             else
               state
+          case Destroyed(target) =>
+            state.battleField.get(target) match {
+              case Some(card) =>
+                state.focus(_.players.index(card.owner).graveyard).modify(_ + (target -> card.card))
+                  .focus(_.battleField).modify(_.removed(target))
+              case None => state
+            }
 
           case Tapped(target) => state.focus(_.battleField.index(target)).modify(_.tap)
           case Untapped => state.focus(_.battleField).modify(_.map(p => (p._1, p._2.unTap)))
 
+          case GameEnded(loser) => EndState(loser)
+
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }
+
+      case EndState(_) => state
     }
   }
 

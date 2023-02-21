@@ -14,6 +14,7 @@ enum Status {
   case Tapped, Untapped
 }
 
+// TODO: Should cards in the library be a sort of instance too ? With ownership
 case class Spell[T <: Card](
   card: T,
   owner: String,
@@ -28,8 +29,7 @@ case class Permanent[T <: PermanentCard](
   firstTurn: Boolean = true,
   damages: Int = 0,
 ) {
-  // TODO: Check for Haste
-  def hasSummoningSickness: Boolean = card.isCreature && firstTurn
+  def hasSummoningSickness: Boolean = card.isCreature && !card.keywordAbilities.contains(KeywordAbilities.haste) && firstTurn
 
   def power: Int = card.basePowerToughness.map(_._1).getOrElse(0)
   def toughness: Int = card.basePowerToughness.map(_._2 - damages).getOrElse(0)
@@ -43,6 +43,10 @@ case class Permanent[T <: PermanentCard](
   }
 }
 
+enum KeywordAbilities {
+  case haste
+}
+
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
   Array(
@@ -51,19 +55,20 @@ case class Permanent[T <: PermanentCard](
     new JsonSubTypes.Type(value = classOf[Instant], name = "instant"),
   )
 )
+// TODO: I think Cards should have an effect
 abstract class Card {
   val name: String
   val subTypes: List[String]
   val color: Color
-  // TODO: Some cards have no mana cost (Ex: Suspend)
+  // Some cards have no mana cost (Ex: Suspend)
   val cost: CastingCost
   val set: MagicSet
   val numberInSet: Int
 
+  def keywordAbilities: List[KeywordAbilities] = List()
   def activatedAbilities: Map[Int, Ability]
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit]
 
-  // TODO: Or has toughness ?
   def isCreature: Boolean = {
     isInstanceOf[Creature] || subTypes.contains("Creature") || subTypes.contains("Legendary Creature")
   }

@@ -13,10 +13,10 @@ enum Step {
   // TODO: Implement more Turn Based actions
   // TODO: Should have Before/After triggers for times when there are multiple steps of the same type
   // TODO: Should be handle in a sort of Event handler
-  def turnBasedActions(state: BoardState, player: PlayerId): List[Event] = MovedToStep(this) +: { this match {
+  def turnBasedActions(state: BoardState, player: PlayerId): List[Event] = List(MovedToStep(this), PriorityPassed(state.activePlayer)) ++ stateBaseAction(state, player) ++ { this match {
     case Step.unTap => List(TurnEnded, Untapped)
     case Step.draw => List(Drawn(1, player))
-    case Step.declareBlockers => if state.combatZone.isEmpty then List(MovedToStep(Step.endOfCombat)) else List(PriorityPassed(state.nextPriority))
+    case Step.declareBlockers => if state.combatZone.isEmpty then List(MovedToStep(Step.endOfCombat)) else List()
     // TODO: This might require a bit of an explanation
     case Step.combatDamage =>
       state.combatZone.flatMap { case (attackerId, CombatZoneEntry(attacker, target, blockers)) => blockers match {
@@ -34,6 +34,13 @@ enum Step {
     case Step.endOfCombat => List(CombatEnded)
     case _ => List()
   }}
+
+  // TODO: I'm still quite scared that the state is not up to date at that point
+  // TODO: Maybe we should have a Resolve command or something
+  def stateBaseAction(state: BoardState, player: PlayerId): List[Event] = {
+      state.players.filter(_._2.life <= 0).map(p => GameEnded(p._1)).toList
+      ++ state.battleField.filter(c => c._2.card.basePowerToughness.isDefined && c._2.toughness <= 0).map(c => Destroyed(c._1)).toList
+  }
 }
 
 enum Phase(steps: List[Step]) {

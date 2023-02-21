@@ -42,6 +42,7 @@ object CommandLine {
         case Initiate =>
           SendAction(context, cardboard, Recover.apply, {
             case game.EmptyState => println("No existing game found"); Prepare
+            case game.EndState(loser) => println(s"Game already ended. $loser lost"); Terminate
             case state: game.BoardState => render(state); Ready(state.priority)
             case state => println(s"Wrong state $state"); Terminate
           })
@@ -87,6 +88,7 @@ object CommandLine {
               SendAction(context, cardboard, action, {
                 case state: game.BoardState if inputs.head == "read" => renderCard(state, readIdFromArg(inputs.tail.head)); Ready(state.priority)
                 case state: game.BoardState => render(state); Ready(state.priority)
+                case game.EndState(loser) => println(s"Good game ! But $loser did not win"); Terminate
                 case state => println(s"Wrong state $state"); Terminate
               }, {
                 text => println(text); Ready(priority)

@@ -41,6 +41,7 @@ case class CombatZoneEntry(
 
 trait State
 case object EmptyState extends State
+case class EndState(loser: String) extends State
 
 // TODO: State = Number of Mulligan
 // TODO: State = Number of Turns
@@ -49,6 +50,7 @@ case class BoardState(
    priority: String,
    players: Map[String, PlayerState],
    currentStep: Step = Step.preCombatMain,
+   // TODO: Stack should have it's own class with Pop/Put/Resolve
    stack: Map[CardId, Spell[Card]] = Map.empty,
    battleField: Map[CardId, Permanent[PermanentCard]] = Map.empty,
    combatZone: Map[CardId, CombatZoneEntry] = Map.empty,

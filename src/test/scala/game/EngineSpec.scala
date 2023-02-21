@@ -38,7 +38,7 @@ class EngineSpec
     "be created for one user" in {
       val result = eventSourcedTestKit.runCommand[StatusReply[State]](New(_, Map("Jack" -> testingDeck)))
       result.reply shouldBe StatusReply.Success
-      result.event shouldBe Created(0, Map("Jack" -> testingDeck))
+      result.event shouldBe GameCreated(0, Map("Jack" -> testingDeck))
       result.stateOfType[BoardState] shouldBe BoardState(
         "Jack",
         "Jack",
