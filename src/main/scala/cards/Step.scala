@@ -12,11 +12,25 @@ enum Step {
 
   // TODO: Implement more Turn Based actions
   // TODO: Should have Before/After triggers for times when there are multiple steps of the same type
+  // TODO: Should be handle in a sort of Event handler
   def turnBasedActions(state: BoardState, player: PlayerId): List[Event] = MovedToStep(this) +: { this match {
     case Step.unTap => List(TurnEnded, Untapped)
     case Step.draw => List(Drawn(1, player))
-    // TODO: declareBlockers => Pass priority to opponent if attackers, otherwise pass to endOfCombat automatically
-    case Step.declareBlockers => if state.combat.attackers.isEmpty then List(MovedToStep(Step.endOfCombat)) else List(PriorityPassed(state.nextPriority))
+    case Step.declareBlockers => if state.combatZone.isEmpty then List(MovedToStep(Step.endOfCombat)) else List(PriorityPassed(state.nextPriority))
+    // TODO: This might require a bit of an explanation
+    case Step.combatDamage =>
+      state.combatZone.flatMap { case (attackerId, CombatZoneEntry(attacker, target, blockers)) => blockers match {
+        case m if m.isEmpty => if attacker.power > 0 then List(DamageDealt(target, attacker.power)) else List()
+        case _ =>
+          val (events, _, _) = blockers.foldLeft((List.empty[Event], attacker.power, attacker.toughness)) { case (acc@(events, powerLeft, toughnessLeft), (blockerId, blocker)) =>
+            if toughnessLeft > 0 && powerLeft > 0 then
+              val damageAssigned = powerLeft.min(blocker.toughness)
+              (events ++ List(DamageDealt(attackerId, blocker.power), DamageDealt(blockerId, damageAssigned)), powerLeft - damageAssigned, toughnessLeft - blocker.power)
+            else acc
+          }
+          events
+          // TODO: Trample => ++ (if powerLeft > 0 then List(DamageDealt(target, powerLeft)) else List())
+      }}.toList
     case Step.endOfCombat => List(CombatEnded)
     case _ => List()
   }}

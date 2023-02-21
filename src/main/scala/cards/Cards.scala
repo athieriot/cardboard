@@ -25,10 +25,14 @@ case class Permanent[T <: PermanentCard](
   owner: String,
   controller: String,
   status: Status = Status.Untapped,
-  firstTurn: Boolean = true
+  firstTurn: Boolean = true,
+  damages: Int = 0,
 ) {
   // TODO: Check for Haste
   def hasSummoningSickness: Boolean = card.isCreature && firstTurn
+
+  def power: Int = card.basePowerToughness.map(_._1).getOrElse(0)
+  def toughness: Int = card.basePowerToughness.map(_._2 - damages).getOrElse(0)
 
   def tap: Permanent[T] = {
     this.copy(status = Status.Tapped)

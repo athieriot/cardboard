@@ -53,8 +53,10 @@ final case class Tapped(target: CardId) extends Event
 final case class ManaAdded(mana: Map[Color, Int], player: PlayerId) extends Event
 final case class ManaPaid(cost: ManaCost, player: PlayerId) extends Event
 
-final case class AttackerDeclared(attacker: CardId) extends Event
-final case class BlockerDeclared(target: CardId, blocker: CardId) extends Event
+sealed trait CombatEvent extends Event
+final case class AttackerDeclared(attacker: CardId) extends CombatEvent
+final case class BlockerDeclared(target: CardId, blocker: CardId) extends CombatEvent
+final case class DamageDealt(target: Target, amount: Int) extends CombatEvent
 
 final case class Drawn(amount: Int, player: PlayerId) extends Event
 final case class Shuffled(order: List[Int], player: PlayerId) extends Event

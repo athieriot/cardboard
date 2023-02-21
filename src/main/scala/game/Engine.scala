@@ -9,6 +9,7 @@ import cards.mana.*
 import cards.types.*
 import game.*
 import monocle.syntax.all.*
+import org.postgresql.shaded.com.ongres.scram.common.bouncycastle.pbkdf2.Pack
 
 import java.util.UUID
 import scala.collection.MapView
@@ -94,7 +95,7 @@ object Engine {
             }
           }
 
-          // TODO: No need to protect against priority but active player
+          // TODO: No need to protect against priority, opponent can always declare => Have a round of priority after
           case DeclareAttacker(replyTo, player, target) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.declareAttackers) {
             state.potentialAttackers(player).get(target) match {
               case Some(_) =>
@@ -109,7 +110,7 @@ object Engine {
             checkStep(replyTo, state, Step.declareBlockers) {
               state.potentialBlockers(player).get(blocker) match {
                 case Some(_) =>
-                  state.combat.attackers.get(target) match {
+                  state.combatZone.get(target) match {
                     case Some(_) => Effect.persist(BlockerDeclared(target, blocker)).thenReply(replyTo)(state => StatusReply.Success(state))
                     case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
                   }
@@ -200,14 +201,14 @@ object Engine {
             }
               .focus(_.currentStep).replace(phase).focus(_.priority).replace(state.activePlayer)
 
-          case CombatEnded => state.focus(_.combat).replace(CombatState())
+          case CombatEnded => state.focus(_.combatZone).replace(Map.empty)
           case TurnEnded =>
             state.players.keys.foldLeft(state) { (state, player) =>
               state.focus(_.players.index(player).landsToPlay).replace(1)
             }
               .focus(_.activePlayer).replace(state.nextPlayer)
               .focus(_.priority).replace(state.nextPlayer)
-              .focus(_.battleField).modify(_.map(p => (p._1, p._2.copy(firstTurn = false))))
+              .focus(_.battleField).modify(_.map(p => (p._1, p._2.copy(firstTurn = false, damages = 0))))
 
           case ManaAdded(mana, player) => state.focus(_.players.index(player).manaPool).modify(_ ++ mana)
           case ManaPaid(manaCost, player) => state.focus(_.players.index(player).manaPool).modify(mp => (mp - manaCost).get)
@@ -235,17 +236,27 @@ object Engine {
               case _ => state
             }
 
+          // TODO: Should move instances to the combat zone
           case AttackerDeclared(target) =>
             state.battleField.get(target) match {
-              case Some(permanent) => state.focus(_.combat.attackers).modify(_ + (target -> permanent))
+              case Some(permanent) => state.focus(_.combatZone).modify(_ + (target -> CombatZoneEntry(permanent, state.nextPlayer)))
               case None => state
             }
 
             // TODO: Naming !
           case BlockerDeclared(target, blocker) =>
-            (state.combat.attackers.get(target), state.battleField.get(blocker)) match {
-              case (Some(_), Some(card)) => state.focus(_.combat.blockers).modify(_ + (target -> List((blocker, card))))
+            (state.combatZone.get(target), state.battleField.get(blocker)) match {
+              case (Some(_), Some(card)) => state.focus(_.combatZone.index(target).blockers).modify(_ + (blocker -> card))
               case _ => state
+            }
+
+            // TODO: Only left to Destroy creatures in a state based action + Stopping the Game when a player loose
+          // TODO: Should we do a more Repository/Model like state for card ?
+          case DamageDealt(target, amount) =>
+            println(s"DamageDealt $target: $amount")
+            target match {
+              case id: CardId => state.focus(_.battleField.index(id).damages).modify(_ + amount)
+              case player: PlayerId => state.focus(_.players.index(player).life).modify(_ - amount)
             }
 
           // TODO: Extract some of those focus

@@ -8,5 +8,7 @@ sbt run
 
 # Next
 
+- State Based Actions
+- Abilities on the Stack
 - Extract Focus
 - Tests !

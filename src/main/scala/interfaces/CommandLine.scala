@@ -148,7 +148,7 @@ object CommandLine {
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println("|")
     if state.stack.nonEmpty then println(s"| 🎴Stack: ${state.stack.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
-    if state.combat.attackers.nonEmpty then println(s"| ⚠ Attack: ${state.combat.attackers.map(p => s"${renderName(p._1, p._2.card)}->${state.combat.blockers.get(p._1).map(b => renderName(b.head._1, b.head._2.card)).getOrElse(state.nextPlayer)}").mkString(", ")}")
+    if state.combatZone.nonEmpty then println(s"| ⚠ Attack: ${state.combatZone.map(p => s"${renderName(p._1, p._2.attacker.card)}->${p._2.blockers.map(b => renderName(b._1, b._2.card)).mkString(", ")}->${p._2.target}").mkString(", ")}")
     println("|")
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
@@ -178,7 +178,8 @@ object CommandLine {
   def readIdFromArg(name: String): CardId = name.split("[\\[\\]]").last.toInt
   def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
   def renderStatus(permanent: Permanent[PermanentCard]): String = if permanent.status == Status.Tapped then "[T]" else ""
-  def renderSummoningSickness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature && permanent.hasSummoningSickness then "[S]" else ""
+  def renderSummoningSickness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature && permanent.hasSummoningSickness then s"[S]${renderPowerToughness(permanent)}" else renderPowerToughness(permanent)
+  def renderPowerToughness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature then s"(${permanent.power}/${permanent.toughness})" else ""
 
   def renderCard(state: BoardState, target: CardId): Unit = {
     val collection: Map[CardId, Card] = state.battleField.view.mapValues(_.card).toMap ++ state.stack.view.mapValues(_.card).toMap

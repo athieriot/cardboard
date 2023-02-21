@@ -14,6 +14,7 @@ import scala.annotation.targetName
 
 type CardId = Int
 type PlayerId = String
+type Target = CardId|PlayerId
 
 //enum TargetZone {
 //  case hand, stack, graveyard, library, battleField, exile, command
@@ -30,9 +31,12 @@ case class PlayerState(
   exile: Map[CardId, Card] = Map.empty,
   command: Option[Card] = None,
 )
-case class CombatState(
-  attackers: Map[CardId, Permanent[PermanentCard]] = Map.empty,
-  blockers: Map[CardId, List[(CardId, Permanent[PermanentCard])]] = Map.empty,
+
+// TODO: Have a way to reassign order and amount of damages when more than one blocker
+case class CombatZoneEntry(
+  attacker: Permanent[PermanentCard],
+  target: Target,
+  blockers: Map[CardId, Permanent[PermanentCard]] = Map.empty,
 )
 
 trait State
@@ -43,23 +47,18 @@ case object EmptyState extends State
 case class BoardState(
    activePlayer: String,
    priority: String,
-   players: Map[String, PlayerState], // TODO: Change String to ID to be able to be a target ?
+   players: Map[String, PlayerState],
    currentStep: Step = Step.preCombatMain,
    stack: Map[CardId, Spell[Card]] = Map.empty,
    battleField: Map[CardId, Permanent[PermanentCard]] = Map.empty,
-   combat: CombatState = CombatState(),
+   combatZone: Map[CardId, CombatZoneEntry] = Map.empty,
    highestId: CardId = 1,
 ) extends State {
 
   def nextPlayer: String = players.keys.sliding(2).find(_.head == activePlayer).map(_.last).getOrElse(players.keys.head)
   def nextPriority: String = players.keys.sliding(2).find(_.head == priority).map(_.last).getOrElse(players.keys.head)
-  
-//  def getFrom(zone: Zone, id: CardId, player: PlayerId): Card = zone match {
-//    case 
-//  }
-    
-  
-  // TODO: Will need to add more restrictions
+
+  // TODO: Will need to add more restrictions based on static abilities
   def potentialAttackers(player: PlayerId): Map[CardId, Permanent[PermanentCard]] = battleField
     .filter(_._2.controller == player)
     .filter(_._2.card.isCreature)
@@ -72,6 +71,8 @@ case class BoardState(
     .filter(_._2.status == Status.Untapped)
 }
 
+// TODO: One Map for Card repository
+// TODO: One Map for Card Zones
 enum Zone {
   case hand, stack, graveyard, library, battleField, exile, command
 }
