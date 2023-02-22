@@ -33,7 +33,8 @@ class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val subTypes: List[String] = List("Creature", "Elf Druid")
   val color: Color = Color.green
   val cost: CastingCost = ManaCost("G")
-  val basePowerToughness: Option[(Int, Int)] = Some((20, 1))
+  val basePower: Option[Int] = Some(20)
+  val baseToughness: Option[Int] = Some(1)
 
   override def keywordAbilities: List[KeywordAbilities] = List(KeywordAbilities.haste)
   

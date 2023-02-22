@@ -1,18 +1,21 @@
 package game
 
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.dispatch.Futures
 import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
+import akka.persistence.typed.scaladsl.{Effect, EffectBuilder, EventSourcedBehavior, ReplyEffect}
 import cards.*
+import cards.Triggers.triggerHandler
 import cards.mana.*
 import cards.types.*
+import com.typesafe.scalalogging.LazyLogging
 import game.*
 import monocle.syntax.all.*
-import org.postgresql.shaded.com.ongres.scram.common.bouncycastle.pbkdf2.Pack
 
 import java.util.UUID
 import scala.collection.MapView
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 object Engine {
@@ -33,6 +36,7 @@ object Engine {
       block
     else
       Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Action only available during ${step.toString}"))
+
 
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     state match {
@@ -105,18 +109,16 @@ object Engine {
           }}
 
           // TODO: Multiple blockers
+          // TODO: Would not work for 4 Players
           case DeclareBlocker(replyTo, player, target, blocker) => checkStep(replyTo, state, Step.declareBlockers) {
-            if player == state.activePlayer then
-              Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Active player cannot declare blockers"))
-            else
-              state.potentialBlockers(player).get(blocker) match {
-                case Some(_) =>
-                  state.combatZone.get(target) match {
-                    case Some(_) => Effect.persist(BlockerDeclared(target, blocker)).thenReply(replyTo)(state => StatusReply.Success(state))
-                    case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
-                  }
-                case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
-              }
+            state.potentialBlockers(state.nextPlayer).get(blocker) match {
+              case Some(_) =>
+                state.combatZone.get(target) match {
+                  case Some(_) => Effect.persist(BlockerDeclared(target, blocker)).thenReply(replyTo)(state => StatusReply.Success(state))
+                  case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
+                }
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+            }
           }
 
           // TODO: Apparently there is a round of priority after declare attacker/blockers
@@ -126,9 +128,17 @@ object Engine {
 
             if state.stack.isEmpty then
               Try {
-                (1 to stepsCountUntilEnd).foldLeft((state.currentStep, List.empty[Event])) { case ((phase, events), _) =>
-                  val nextPhase = phase.next()
-                  (nextPhase, events ++ nextPhase.turnBasedActions(state, player))
+                val activePlayer = state.activePlayer
+                (1 to stepsCountUntilEnd).foldLeft((state: State, List.empty[Event])) { case ((state, events), _) =>
+                  state match {
+                    case state: BoardState =>
+                      val nextPhase = state.currentStep.next()
+                      val (newState, newEvents) = triggerHandler(state, MovedToStep(nextPhase))
+                      val (_, finalEvents) = triggerHandler(newState, PriorityPassed(activePlayer))
+
+                      (newState, events ++ newEvents ++ finalEvents)
+                    case _ => (state, events)
+                  }
                 }._2
               } match {
                 case Success(events) => Effect.persist(events).thenReply(replyTo)(state => StatusReply.Success(state))
@@ -155,9 +165,13 @@ object Engine {
             }
           }}
           case EndTurn(replyTo, player) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.cleanup) {
+            val nextPlayer = state.nextPlayer
             state.players(player).hand match {
               case hand if hand.size <= MAX_HAND_SIZE =>
-                Effect.persist(Step.unTap.turnBasedActions(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                val (newState, newEvents) = triggerHandler(state, MovedToStep(Step.unTap))
+                val (_, finalEvents) = triggerHandler(newState, PriorityPassed(nextPlayer))
+
+                Effect.persist(newEvents ++ finalEvents).thenReply(replyTo)(state => StatusReply.Success(state))
               case hand if hand.size > MAX_HAND_SIZE =>
                 Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Maximum hand size exceeded, discard down to 7"))
             }
@@ -171,7 +185,7 @@ object Engine {
     }
   }
 
-  private val eventHandler: (State, Event) => State = { (state, event) =>
+  val eventHandler: (State, Event) => State = { (state, event) =>
     state match {
       case EmptyState =>
         event match {
@@ -250,7 +264,6 @@ object Engine {
             // TODO: Only left to Destroy creatures in a state based action + Stopping the Game when a player loose
           // TODO: Should we do a more Repository/Model like state for card ?
           case DamageDealt(target, amount) =>
-            println(s"DamageDealt $target: $amount")
             target match {
               case id: CardId => state.focus(_.battleField.index(id).damages).modify(_ + amount)
               case player: PlayerId => state.focus(_.players.index(player).life).modify(_ - amount)

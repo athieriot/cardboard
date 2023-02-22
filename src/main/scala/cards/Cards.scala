@@ -31,8 +31,8 @@ case class Permanent[T <: PermanentCard](
 ) {
   def hasSummoningSickness: Boolean = card.isCreature && !card.keywordAbilities.contains(KeywordAbilities.haste) && firstTurn
 
-  def power: Int = card.basePowerToughness.map(_._1).getOrElse(0)
-  def toughness: Int = card.basePowerToughness.map(_._2 - damages).getOrElse(0)
+  def power: Int = card.basePower.getOrElse(0)
+  def toughness: Int = card.baseToughness.map(_ - damages).getOrElse(0)
 
   def tap: Permanent[T] = {
     this.copy(status = Status.Tapped)
@@ -79,5 +79,6 @@ abstract class Card {
 }
 
 abstract class PermanentCard extends Card {
-  val basePowerToughness: Option[(Int, Int)]
+  val basePower: Option[Int]
+  val baseToughness: Option[Int]
 }
