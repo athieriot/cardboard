@@ -6,7 +6,7 @@ import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EffectBuilder, EventSourcedBehavior, ReplyEffect}
 import cards.*
-import cards.Triggers.triggerHandler
+import Triggers.triggersHandler
 import cards.mana.*
 import cards.types.*
 import com.typesafe.scalalogging.LazyLogging
@@ -64,7 +64,7 @@ object Engine {
           case PlayLand(replyTo, player, target) => checkPriority(replyTo, state, player) {
             state.players(player).hand.get(target) match {
               case Some(land: Land) => land.checkConditions(state, player) match {
-                case Success(_) => Effect.persist(LandPlayed(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                case Success(_) => Effect.persist(triggersHandler(state, List(LandPlayed(target, player)))._2).thenReply(replyTo)(state => StatusReply.Success(state))
                 case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
               }
               case Some(_) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target is not a land"))
@@ -76,7 +76,7 @@ object Engine {
               // TODO: There can be alternative costs also
               // TODO: ETB triggers
               case Some(card) => card.checkConditions(state, player) match {
-                case Success(_) => Effect.persist(card.cost.pay(target, player) ++ List(Stacked(target, player), PriorityPassed(state.nextPriority))).thenReply(replyTo)(state => StatusReply.Success(state))
+                case Success(_) => Effect.persist(triggersHandler(state, card.cost.pay(target, player) ++ List(Stacked(target, player), PriorityPassed(state.nextPriority)))._2).thenReply(replyTo)(state => StatusReply.Success(state))
                 case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
               }
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
@@ -90,7 +90,7 @@ object Engine {
                 permanent.card.activatedAbilities.get(abilityId) match {
                   case Some(ability) =>
                     if ability.cost.canPay(permanent) then
-                      Effect.persist(ability.cost.pay(target, player) ++ ability.effect(state, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                      Effect.persist(triggersHandler(state, ability.cost.pay(target, player) ++ ability.effect(state, player))._2).thenReply(replyTo)(state => StatusReply.Success(state))
                     else
                       Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
                   case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Abilities not found"))
@@ -103,18 +103,18 @@ object Engine {
           case DeclareAttacker(replyTo, player, target) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.declareAttackers) {
             state.potentialAttackers(player).get(target) match {
               case Some(_) =>
-                Effect.persist(List(Tapped(target), AttackerDeclared(target))).thenReply(replyTo)(state => StatusReply.Success(state))
+                Effect.persist(triggersHandler(state, List(Tapped(target), AttackerDeclared(target)))._2).thenReply(replyTo)(state => StatusReply.Success(state))
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
           }}
 
           // TODO: Multiple blockers
           // TODO: Would not work for 4 Players
-          case DeclareBlocker(replyTo, player, target, blocker) => checkStep(replyTo, state, Step.declareBlockers) {
+          case DeclareBlocker(replyTo, _, target, blocker) => checkStep(replyTo, state, Step.declareBlockers) {
             state.potentialBlockers(state.nextPlayer).get(blocker) match {
               case Some(_) =>
                 state.combatZone.get(target) match {
-                  case Some(_) => Effect.persist(BlockerDeclared(target, blocker)).thenReply(replyTo)(state => StatusReply.Success(state))
+                  case Some(_) => Effect.persist(triggersHandler(state, List(BlockerDeclared(target, blocker)))._2).thenReply(replyTo)(state => StatusReply.Success(state))
                   case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
                 }
               case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
@@ -132,11 +132,12 @@ object Engine {
                 (1 to stepsCountUntilEnd).foldLeft((state: State, List.empty[Event])) { case ((state, events), _) =>
                   state match {
                     case state: BoardState =>
-                      val nextPhase = state.currentStep.next()
-                      val (newState, newEvents) = triggerHandler(state, MovedToStep(nextPhase))
-                      val (_, finalEvents) = triggerHandler(newState, PriorityPassed(activePlayer))
+                      val (newState, newEvents) = Try(state.currentStep.next()) match {
+                        case Success(nextPhase) => triggersHandler(state, List(MovedToStep(nextPhase), PriorityPassed(activePlayer)))
+                        case Failure(_) => (state, List.empty)
+                      }
 
-                      (newState, events ++ newEvents ++ finalEvents)
+                      (newState, events ++ newEvents)
                     case _ => (state, events)
                   }
                 }._2
@@ -146,18 +147,18 @@ object Engine {
               }
             else
             // Resolve the stack
-            // TODO: This should probably be a trigger loop for each event
-              Effect.persist(state.stack.toList.reverse.flatMap { case (id, spell) => spell.card match {
+            // TODO: Should stop when a spell need interaction
+              Effect.persist(triggersHandler(state, state.stack.toList.reverse.flatMap { case (id, spell) => spell.card match {
                 case _: Creature => List(EnteredTheBattlefield(id))
                 case _ => List()
-              }} :+ PriorityPassed(state.activePlayer)).thenReply(replyTo)(state => StatusReply.Success(state))
+              }} :+ PriorityPassed(state.activePlayer))._2).thenReply(replyTo)(state => StatusReply.Success(state))
           }
           case Discard(replyTo, player, target) => checkPriority(replyTo, state, player) { checkStep(replyTo, state, Step.cleanup) {
             state.players(player).hand.get(target) match {
               case Some(_) =>
                 state.players(player).hand match {
                   case hand if hand.size > MAX_HAND_SIZE =>
-                    Effect.persist(Discarded(target, player)).thenReply(replyTo)(state => StatusReply.Success(state))
+                    Effect.persist(triggersHandler(state, List(Discarded(target, player)))._2).thenReply(replyTo)(state => StatusReply.Success(state))
                   case hand if hand.size <= MAX_HAND_SIZE =>
                     Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Hand size does not exceed maximum, you can EndTurn"))
                 }
@@ -168,10 +169,7 @@ object Engine {
             val nextPlayer = state.nextPlayer
             state.players(player).hand match {
               case hand if hand.size <= MAX_HAND_SIZE =>
-                val (newState, newEvents) = triggerHandler(state, MovedToStep(Step.unTap))
-                val (_, finalEvents) = triggerHandler(newState, PriorityPassed(nextPlayer))
-
-                Effect.persist(newEvents ++ finalEvents).thenReply(replyTo)(state => StatusReply.Success(state))
+                Effect.persist(triggersHandler(state, List(TurnEnded, MovedToStep(Step.unTap), PriorityPassed(nextPlayer)))._2).thenReply(replyTo)(state => StatusReply.Success(state))
               case hand if hand.size > MAX_HAND_SIZE =>
                 Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Maximum hand size exceeded, discard down to 7"))
             }
@@ -218,7 +216,6 @@ object Engine {
               state.focus(_.players.index(player).landsToPlay).replace(1)
             }
               .focus(_.activePlayer).replace(state.nextPlayer)
-              .focus(_.priority).replace(state.nextPlayer)
               .focus(_.battleField).modify(_.map(p => (p._1, p._2.copy(firstTurn = false, damages = 0))))
 
           case ManaAdded(mana, player) => state.focus(_.players.index(player).manaPool).modify(_ ++ mana)

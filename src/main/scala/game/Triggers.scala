@@ -1,16 +1,26 @@
-package cards
+package game
 
-import game.Engine.eventHandler
+import cards.Step
 import game.*
+import game.Engine.eventHandler
 
 // TODO: Priority rounds could use a "Pass" command
-
 object Triggers {
+
+  def triggersHandler(state: State, events: List[Event]): (State, List[Event]) = {
+    events.foldLeft((state, List.empty[Event])) { case ((state, acc), event) =>
+      val (newState, newEvents) = triggerHandler(state: State, event: Event)
+      (newState, acc ++ newEvents)
+    }
+  }
+
   // TODO: Try so we can throw errors and also map/flatMap ?
   def triggerHandler(state: State, event: Event): (State, List[Event]) =
     val newEvents = event match {
-      case MovedToStep(step) => event +: turnBaseActions(step, eventHandler(state, event))
-      case PriorityPassed(_) => Triggers.stateBasedActionsLoop(state) :+ event
+      case MovedToStep(step) =>
+        val newState = eventHandler(state, event)
+        event +: triggersHandler(newState, turnBaseActions(step, newState))._2
+      case PriorityPassed(_) => triggersHandler(state, stateBasedActionsLoop(state))._2 :+ event
       case _ => List(event)
     }
     (newEvents.foldLeft(state)(eventHandler(_, _)), newEvents)
@@ -34,7 +44,7 @@ object Triggers {
   private def turnBaseActions(step: Step, state: State): List[Event] = state match {
     case state: BoardState =>
       step match {
-        case Step.unTap => List(TurnEnded, Untapped)
+        case Step.unTap => List(Untapped)
         case Step.draw => List(Drawn(1, state.activePlayer))
         case Step.declareBlockers => if state.combatZone.isEmpty then List(MovedToStep(Step.endOfCombat)) else List()
         case Step.combatDamage =>
