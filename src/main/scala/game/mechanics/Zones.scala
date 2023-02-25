@@ -37,7 +37,8 @@ case object Battlefield extends Zone[Permanent[PermanentCard]] {
   }
 }
 
-abstract class PlayerZone(@unused player: PlayerId) extends Zone[UnPlayed[Card]] {
+abstract class PlayerZone(player: PlayerId) extends Zone[UnPlayed[Card]] {
+  def isOf(player: PlayerId): Boolean = this.player == player
   def convert[From <: CardState[Card]](by: PlayerId, from: From): UnPlayed[Card] = from match {
     case s: Spell[_] => UnPlayed(s.card, s.owner)
     case s: Permanent[_] => UnPlayed(s.card, s.owner)

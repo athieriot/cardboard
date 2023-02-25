@@ -47,15 +47,14 @@ case class BoardState(
    activePlayer: String,
    priority: String,
    players: Map[String, PlayerState],
-   currentStep: Step = Step.preCombatMain,
-
-   cardsZone: Map[CardId, Zone[CardState[Card]]] = Map.empty,
+   cardsZone: Map[CardId, Zone[CardState[Card]]],
 
    // TODO: Stack should have it's own class with Pop/Put/Resolve
    stack: Map[CardId, Spell[Card]] = Map.empty,
    battleField: Map[CardId, Permanent[PermanentCard]] = Map.empty,
    combatZone: Map[CardId, CombatZoneEntry] = Map.empty,
-
+                     
+   currentStep: Step = Step.preCombatMain,
    createdAt: Instant = Instant.now(),
    turnCount: Int = 1
 ) extends State {
@@ -77,6 +76,7 @@ case class BoardState(
   // Card methods
   def modifyCardFromZone[A <: CardState[Card]](id: CardId, zone: Zone[A], block: A => A): BoardState = zone.focusIn(id, this).modify(block)
   def getCard(id: CardId): Option[(Zone[CardState[Card]], CardState[Card])] = cardsZone.get(id).flatMap(zone => getCardFromZone(id, zone).map((zone, _)))
+  def getCardOwner(id: CardId): Option[String] = getCard(id).map(_._2.owner)
   // TODO: Top or Bottom ?
   def moveCards[A <: CardState[Card]](ids: List[CardId], by: PlayerId, origin: Zone[A], destination: Zone[A]): BoardState =
     ids.foldRight(this) { case (id, state) => state.moveCard(id, by, origin, destination) }

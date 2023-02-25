@@ -9,7 +9,7 @@ sbt run
 # Next
 
 - Abilities on the Stack
-- Extract Focus
-- Refactor "zones" storage
+- Extract Context / "CommandController"
+- Refactor CombatZone
 - Improve Priority handling by implementing "Pass"
 - Tests !

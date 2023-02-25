@@ -26,6 +26,7 @@ sealed abstract class Creature extends PermanentCard {
     else if !cost.canPay(state, player) then
       throw new RuntimeException("Cannot pay the cost")
   }
+  def effects(id: CardId, state: BoardState, player: PlayerId): List[Event] = List(EnteredTheBattlefield(id))
 }
 
 class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
@@ -33,10 +34,8 @@ class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val subTypes: List[String] = List("Creature", "Elf Druid")
   val color: Color = Color.green
   val cost: CastingCost = ManaCost("G")
-  val basePower: Option[Int] = Some(20)
+  val basePower: Option[Int] = Some(1)
   val baseToughness: Option[Int] = Some(1)
-
-  override def keywordAbilities: List[KeywordAbilities] = List(KeywordAbilities.haste)
   
   // TODO: Effect = ETB
   def activatedAbilities: Map[Int, Ability] = Map(

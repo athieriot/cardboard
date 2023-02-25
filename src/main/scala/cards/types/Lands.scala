@@ -26,6 +26,8 @@ sealed abstract class Land extends PermanentCard {
     else if state.players(player).landsToPlay <= 0 then
       throw new RuntimeException("You already played a land this turn")
   }
+  
+  def effects(id: CardId, state: BoardState, player: PlayerId): List[Event] = List(LandPlayed(id, player))
 }
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")

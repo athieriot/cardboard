@@ -50,6 +50,7 @@ case object CombatEnded extends TurnBaseEvent
 final case class Stacked(target: CardId, player: PlayerId) extends Event
 final case class LandPlayed(target: CardId, player: PlayerId) extends Event
 final case class EnteredTheBattlefield(target: CardId) extends Event
+final case class PutIntoGraveyard(target: CardId, player: PlayerId) extends Event
 
 // TODO: Stop stack resolution and ask for interaction. Command "choose" ?
 final case class Tapped(target: CardId) extends Event

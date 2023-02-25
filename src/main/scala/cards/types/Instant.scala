@@ -17,6 +17,7 @@ import scala.util.Try
 )
 sealed abstract class Instant extends Card {
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {}
+  def effects(id: CardId, state: BoardState, player: PlayerId): List[Event] = List(PutIntoGraveyard(id, player))
 }
 
 class Intervene(val set: MagicSet, val numberInSet: Int) extends Instant {

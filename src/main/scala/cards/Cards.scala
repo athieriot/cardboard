@@ -66,9 +66,11 @@ abstract class Card {
   val set: MagicSet
   val numberInSet: Int
 
-  def keywordAbilities: List[KeywordAbilities] = List()
-  def activatedAbilities: Map[Int, Ability]
   def checkConditions(state: BoardState, player: PlayerId): Try[Unit]
+  def effects(id: CardId, state: BoardState, player: PlayerId): List[Event]
+  
+  def keywordAbilities: List[KeywordAbilities] = List.empty
+  def activatedAbilities: Map[Int, Ability] = Map.empty
 
   def isCreature: Boolean = {
     isInstanceOf[Creature] || subTypes.contains("Creature") || subTypes.contains("Legendary Creature")
