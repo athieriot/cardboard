@@ -8,6 +8,7 @@ import cards.*
 import cards.mana.*
 import cards.types.*
 import game.*
+import game.mechanics.*
 import interfaces.CommandLine.renderName
 import org.jline.builtins.Completers.TreeCompleter.node
 import org.jline.builtins.Completers.{OptDesc, OptionCompleter, TreeCompleter}
@@ -15,6 +16,7 @@ import org.jline.reader.{LineReader, LineReaderBuilder}
 import org.jline.reader.impl.completer.{ArgumentCompleter, EnumCompleter, StringsCompleter}
 import org.jline.terminal.{Terminal, TerminalBuilder}
 
+import scala.annotation.unused
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
@@ -44,7 +46,6 @@ object CommandLine {
             case game.EmptyState => println("No existing game found"); Prepare
             case game.EndState(loser) => println(s"Game already ended. $loser lost"); Terminate
             case state: game.BoardState => render(state); Ready(state.priority)
-            case state => println(s"Wrong state $state"); Terminate
           })
 
         case Prepare =>
@@ -104,8 +105,8 @@ object CommandLine {
     target: ActorRef[Command],
     request: ActorRef[StatusReply[State]] => Command,
     onSuccess: State => CommandLine.Status,
-    onError: String => CommandLine.Status = {message => println(s"An error occurred ${message}"); Terminate},
-  )(implicit responseTimeout: Timeout, classTag: ClassTag[State]): Behavior[CommandLine.Status] = {
+    onError: String => CommandLine.Status = {message => println(s"An error occurred $message"); Terminate},
+  )(implicit responseTimeout: Timeout, @unused classTag: ClassTag[State]): Behavior[CommandLine.Status] = {
     context.askWithStatus(target, request) {
       case Success(state) => onSuccess(state)
       case Failure(StatusReply.ErrorMessage(text)) => onError(text)
@@ -114,20 +115,23 @@ object CommandLine {
     Behaviors.same
   }
 
-  private def refreshAutoComplete(state: BoardState): Unit = {
-    val collection: Map[CardId, Card] = state.battleField.view.mapValues(_.card).toMap ++ state.stack.view.mapValues(_.card).toMap
-      ++ state.players.flatMap(player => player._2.hand ++ player._2.graveyard ++ player._2.exile).view
+  private def buildCollection(state: BoardState): Map[CardId, CardState[Card]] =
+    state.listCardsFromZone(Battlefield) ++ state.listCardsFromZone(Stack)
+      ++ state.players.flatMap(player => state.listCardsFromZone(Hand(player._1)) ++ state.listCardsFromZone(Graveyard(player._1)) ++ state.listCardsFromZone(Exile(player._1)))
 
+  private def refreshAutoComplete(state: BoardState): Unit = {
+
+    val collection = buildCollection(state)
     lineReader = LineReaderBuilder.builder()
       .terminal(terminal)
       .completer(new TreeCompleter(
-        node("read", node(collection.map(c => renderArg(c._1, c._2)).toList: _*)),
-        if !state.players(state.priority).hand.exists(_._2.isInstanceOf[Land]) then node("play") else node("play", node(state.players(state.priority).hand.filter(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
-        if state.players(state.priority).hand.forall(_._2.isInstanceOf[Land]) then node("cast") else node("cast", node(state.players(state.priority).hand.filterNot(_._2.isInstanceOf[Land]).map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("read", node(collection.map(c => renderArg(c._1, c._2.card)).toList: _*)),
+        if !state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isInstanceOf[Land]) then node("play") else node("play", node(state.listCardsFromZone(Hand(state.priority)).filter(_._2.card.isInstanceOf[Land]).map(c => renderArg(c._1, c._2.card)).toList: _*)),
+        if state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isInstanceOf[Land]) then node("cast") else node("cast", node(state.listCardsFromZone(Hand(state.priority)).filterNot(_._2.card.isInstanceOf[Land]).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         if state.potentialAttackers(state.priority).isEmpty then node("attack") else node("attack", node(state.potentialAttackers(state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         // TODO: TreeCompleter for blockers
         if !state.battleField.exists(_._2.owner == state.priority) then node("activate") else node("activate", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
-        node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2)).toList: _*)),
+        node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("next"),
         node("end"),
         node("exit"),
@@ -136,7 +140,7 @@ object CommandLine {
   }
 
   private def render(state: BoardState): Unit = {
-    refreshAutoComplete(state)
+//    refreshAutoComplete(state)
 
     println("\n")
     val playerOne = state.players.head
@@ -144,7 +148,7 @@ object CommandLine {
     renderPlayer(state, playerOne._1, playerOne._2)
 
     // TODO: Show each types (Artefacts, Enchantments, Planeswalkers) on a different line
-    println(s"| ✋ Hand (${playerOne._2.hand.size}): ${playerOne._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| ✋ Hand (${playerOne._2.hand.size}): ${playerOne._2.hand.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
     println("|------------------")
     println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
@@ -155,7 +159,7 @@ object CommandLine {
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
     println("|------------------")
-    println(s"| ✋ Hand (${playerTwo._2.hand.size}): ${playerTwo._2.hand.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| ✋ Hand (${playerTwo._2.hand.size}): ${playerTwo._2.hand.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
 
     renderPlayer(state, playerTwo._1, playerTwo._2)
 
@@ -171,33 +175,35 @@ object CommandLine {
     println("|------------------")
     println(s"| Player: $active$name$priority - Life: ${playerState.life}")
     println(s"| 📚 Library: ${playerState.library.size}")
-    println(s"| 🪦  Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2)).mkString(", ")}")
+    println(s"| 🪦  Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
     println(s"| 🪄  Mana: ${playerState.manaPool.pool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")
     println("|------------------")
   }
 
-  def renderArg(id: CardId, card: Card): String = s"${card.name.replace(" ", "_")}[$id]"
-  def readIdFromArg(name: String): CardId = name.split("[\\[\\]]").last.toInt
-  def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
-  def renderStatus(permanent: Permanent[PermanentCard]): String = if permanent.status == Status.Tapped then "[T]" else ""
-  def renderSummoningSickness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature && permanent.hasSummoningSickness then s"[S]${renderPowerToughness(permanent)}" else renderPowerToughness(permanent)
-  def renderPowerToughness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature then s"(${permanent.power}/${permanent.toughness})" else ""
+  private def renderArg(id: CardId, card: Card): String = s"${card.name.replace(" ", "_")}[$id]"
+  private def readIdFromArg(name: String): CardId = name.split("[\\[\\]]").last.toInt
+  private def renderName(id: CardId, card: Card): String = s"${terminalColor(card.color, card.name)}[$id]"
+  private def renderStatus(permanent: Permanent[PermanentCard]): String = if permanent.status == Status.Tapped then "[T]" else ""
+  private def renderSummoningSickness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature && permanent.hasSummoningSickness then s"[S]${renderPowerToughness(permanent)}" else renderPowerToughness(permanent)
+  private def renderPowerToughness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature then s"(${permanent.power}/${permanent.toughness})" else ""
 
-  def renderCard(state: BoardState, target: CardId): Unit = {
-    val collection: Map[CardId, Card] = state.battleField.view.mapValues(_.card).toMap ++ state.stack.view.mapValues(_.card).toMap
-      ++ state.players.flatMap(player => player._2.hand ++ player._2.graveyard ++ player._2.exile).view
+  private def renderCard(state: BoardState, target: CardId): Unit = {
 
-    collection.get(target) match {
+    buildCollection(state).get(target) match {
       case None => println("Card not found")
       case Some(card) =>
-        println(s"|Name: ${card.name}")
-        println(s"|Subtype: ${card.subTypes.mkString(" - ")}")
-        println(s"|Color: ${terminalColor(card.color, card.color.toString)}")
-        println(s"|Cost: ${card.cost.toString}")
-        println(s"|Preview: ${card.preview}")
+        println(s"|Name: ${card.card.name}")
+        println(s"|Subtype: ${card.card.subTypes.mkString(" - ")}")
+        println(s"|Color: ${terminalColor(card.card.color, card.card.color.toString)}")
+        println(s"|Cost: ${card.card.cost.toString}")
+        println(s"|Preview: ${card.card.preview}")
         print("|Abilities:\n")
-        card.activatedAbilities.foreach { (i, ability) =>
+        card.card.activatedAbilities.foreach { (i, ability) =>
           println(s"|\t[$i]: [${ability.cost.toString}], ${ability.text}")
+        }
+
+        card.card match {
+          case permanent: PermanentCard => s"(${permanent.basePower.getOrElse(0)}/${permanent.baseToughness.getOrElse(0)})"
         }
     }
   }

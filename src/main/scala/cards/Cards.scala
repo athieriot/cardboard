@@ -14,12 +14,16 @@ enum Status {
   case Tapped, Untapped
 }
 
+abstract class CardState[+T] { val card: T; val owner: String }
+
+case class UnPlayed[T <: Card](card: T, owner: String) extends CardState[T]
+
 // TODO: Should cards in the library be a sort of instance too ? With ownership
 case class Spell[T <: Card](
   card: T,
   owner: String,
   controller: String,
-)
+) extends CardState[T]
 
 case class Permanent[T <: PermanentCard](
   card: T,
@@ -28,19 +32,16 @@ case class Permanent[T <: PermanentCard](
   status: Status = Status.Untapped,
   firstTurn: Boolean = true,
   damages: Int = 0,
-) {
+) extends CardState[T] {
   def hasSummoningSickness: Boolean = card.isCreature && !card.keywordAbilities.contains(KeywordAbilities.haste) && firstTurn
 
   def power: Int = card.basePower.getOrElse(0)
   def toughness: Int = card.baseToughness.map(_ - damages).getOrElse(0)
 
-  def tap: Permanent[T] = {
-    this.copy(status = Status.Tapped)
-  }
-
-  def unTap: Permanent[T] = {
-    this.copy(status = Status.Untapped)
-  }
+  def tap: Permanent[T] = this.copy(status = Status.Tapped)
+  def unTap: Permanent[T] = this.copy(status = Status.Untapped)
+  
+  def takeDamage(amount: Int): Permanent[T] = this.copy(damages = damages - amount)
 }
 
 enum KeywordAbilities {

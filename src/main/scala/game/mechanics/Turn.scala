@@ -1,5 +1,6 @@
-package cards
+package game.mechanics
 
+import cards.*
 import game.*
 
 enum Step {

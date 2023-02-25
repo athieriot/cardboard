@@ -5,6 +5,7 @@ import akka.pattern.StatusReply
 import cards.*
 import game.*
 import cards.mana.*
+import game.mechanics.Step
 
 /**
  * EventSourcing Behavior Commands
@@ -60,7 +61,7 @@ final case class AttackerDeclared(attacker: CardId) extends CombatEvent
 final case class BlockerDeclared(target: CardId, blocker: CardId) extends CombatEvent
 final case class DamageDealt(target: Target, amount: Int) extends CombatEvent
 
-final case class Destroyed(target: CardId) extends Event
+final case class Destroyed(target: CardId, player: PlayerId) extends Event
 final case class Drawn(amount: Int, player: PlayerId) extends Event
 final case class Shuffled(order: List[Int], player: PlayerId) extends Event
 final case class Discarded(target: CardId, player: PlayerId) extends Event

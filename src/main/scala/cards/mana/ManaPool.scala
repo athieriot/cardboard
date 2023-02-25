@@ -42,7 +42,6 @@ case class ManaPool(pool: Map[Color, Int] = Color.values.map((_, 0)).toMap) {
   }
 
   @targetName("minus")
-  // TODO: Case for any color ?
   def -(mana: (Option[Color], Int)): Try[ManaPool] = Try {
     (1 to mana._2).foldLeft(this) { case (manaPool, _) =>
       mana._1 match {

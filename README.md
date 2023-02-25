@@ -8,10 +8,8 @@ sbt run
 
 # Next
 
-- Improve triggerHandler to handle a List of events (and would run on events triggered by itself)
-- Refactor "zones" storage
 - Abilities on the Stack
-- Improve Priority handling by implementing "Pass"
-- Fix "next" command
 - Extract Focus
+- Refactor "zones" storage
+- Improve Priority handling by implementing "Pass"
 - Tests !
