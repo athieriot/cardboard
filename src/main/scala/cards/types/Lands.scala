@@ -4,6 +4,7 @@ import cards.*
 import cards.mana.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
+import game.mechanics.*
 import monocle.syntax.all.*
 
 import java.net.URL
@@ -16,7 +17,7 @@ import scala.util.Try
   )
 )
 sealed abstract class Land extends PermanentCard {
-  def checkCastingConditions(ctx: Context): Try[Unit] = Try {
+  override def checkCastingConditions(ctx: Context): Try[Unit] = super.checkCastingConditions(ctx).flatMap { _ => Try {
     if ctx.state.activePlayer != ctx.player then
       throw new RuntimeException("You can only play lands during your turn")
     else if !ctx.state.currentStep.isMain then
@@ -25,9 +26,9 @@ sealed abstract class Land extends PermanentCard {
       throw new RuntimeException("You can only play lands when the stack is empty")
     else if ctx.state.players(ctx.player).landsToPlay <= 0 then
       throw new RuntimeException("You already played a land this turn")
-  }
+  }}
   
-  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(LandPlayed(id, ctx.player))
+  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(LandPlayed(id, ctx.player), EnteredTheBattlefield(id))
 }
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
@@ -35,7 +36,7 @@ sealed abstract class Land extends PermanentCard {
   Array(
     new JsonSubTypes.Type(value = classOf[Forest], name = "forest"),
     new JsonSubTypes.Type(value = classOf[Island], name = "island"),
-//    new JsonSubTypes.Type(value = classOf[Mountain], name = "mountain"),
+    new JsonSubTypes.Type(value = classOf[Mountain], name = "mountain"),
 //    new JsonSubTypes.Type(value = classOf[Swamp], name = "swamp"),
 //    new JsonSubTypes.Type(value = classOf[Plains], name = "plains"),
   )
@@ -64,6 +65,15 @@ class Island(val set: MagicSet, val numberInSet: Int) extends BasicLand {
   val subTypes: List[String] = List("Basic Land", "Island")
   val cost: CastingCost = ManaCost("0")
   val colorProduced: Color = Color.blue
+  val basePower: Option[Int] = None
+  val baseToughness: Option[Int] = None
+}
+
+class Mountain(val set: MagicSet, val numberInSet: Int) extends BasicLand {
+  val name: String = "Mountain"
+  val subTypes: List[String] = List("Basic Land", "Mountain")
+  val cost: CastingCost = ManaCost("0")
+  val colorProduced: Color = Color.red
   val basePower: Option[Int] = None
   val baseToughness: Option[Int] = None
 }

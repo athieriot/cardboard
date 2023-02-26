@@ -17,6 +17,7 @@ import monocle.syntax.all.*
 
 import java.util.UUID
 import scala.collection.MapView
+import scala.collection.immutable.ListMap
 import scala.concurrent.Future
 import scala.util.{Failure, Random, Success, Try}
 
@@ -62,7 +63,7 @@ object Engine {
 
           case Cast(replyTo, player, id, args) => parseContext(replyTo, state, player, args) { ctx => checkPriority(ctx) { // Player Wrapper
             persistEvents(ctx) {
-              state.getCardFromZone(id, Hand(player)) match {
+              state.getCardFromZone(id, Hand(player)).filterNot(_.card.isLand) match {
                 case Some(UnPlayed(card, _)) => card.checkCastingConditions(ctx).map { _ =>
                   // TODO: There can be alternative costs also
                   card.cost.pay(id, player) ++ List(Stacked(id, player, args), PriorityPassed(state.nextPriority))
@@ -126,9 +127,6 @@ object Engine {
           case Resolve(replyTo, player) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) {
             persistEvents(ctx) {
               Try {
-                // TODO: Stop when stack is empty
-                // TODO: Real target is the one you have to choose on cast => Rename Target to Id then take an extra parameter
-
                 // TODO: Should stop/print a message when a spell need interaction
                 state.listCardsFromZone(Stack).toList.reverse match {
                   case Nil => throw new RuntimeException("Nothing to resolve. You can go to next phase")
@@ -143,31 +141,27 @@ object Engine {
           }}
 
           case Discard(replyTo, player, id) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.cleanup) {
-            state.players(player).hand.get(id) match {
-              case Some(_) =>
-                state.players(player).hand match {
-                  case hand if hand.size > MAX_HAND_SIZE =>
-                    Effect.persist(triggersHandler(state, List(Discarded(id, player)))).thenReply(replyTo)(state => StatusReply.Success(state))
-                  case hand if hand.size <= MAX_HAND_SIZE =>
-                    Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Hand size does not exceed maximum, you can EndTurn"))
-                }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
-            }
+            persistEvents(ctx) { Try {
+              state.players(player).hand.get(id) match {
+                case Some(_) =>
+                  state.listCardsFromZone(Hand(player)) match {
+                    case hand if hand.size > MAX_HAND_SIZE => List(Discarded(id, player))
+                    case hand if hand.size <= MAX_HAND_SIZE => throw new RuntimeException("Hand size does not exceed maximum, you can EndTurn")
+                  }
+                case None => throw new RuntimeException("Card not found")
+              }
+            }}
           }}}
           case EndTurn(replyTo, player) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.cleanup) {
-            val nextPlayer = state.nextPlayer
-            state.players(player).hand match {
-              case hand if hand.size <= MAX_HAND_SIZE =>
-                Effect.persist(triggersHandler(state, List(TurnEnded, MovedToStep(Step.unTap), PriorityPassed(nextPlayer)))).thenReply(replyTo)(state => StatusReply.Success(state))
-              case hand if hand.size > MAX_HAND_SIZE =>
-                Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Maximum hand size exceeded, discard down to 7"))
-            }
+            persistEvents(ctx) { Try {
+              state.listCardsFromZone(Hand(player)) match {
+                case hand if hand.size <= MAX_HAND_SIZE => List(TurnEnded, MovedToStep(Step.unTap), PriorityPassed(state.nextPlayer))
+                case hand if hand.size > MAX_HAND_SIZE => throw new RuntimeException("Maximum hand size exceeded, discard down to 7")
+              }
+            }}
           }}}
 
           case _ => Effect.noReply
-
-          // TODO: When pass priority, check state based actions
-          // TODO: Implement Mulligan
         }
     }
   }
@@ -196,7 +190,7 @@ object Engine {
           case GameEnded(loser) => EndState(loser)
 
           case Shuffled(order, player) =>
-            val shuffled = order.zip(state.listCardsFromZone(Library(player))).sortBy(_._1).map(_._2).toMap
+            val shuffled = ListMap(order.zip(state.listCardsFromZone(Library(player))).sortBy(_._1).map(_._2): _*)
             state.focusOnZone(Library(player)).replace(shuffled)
 
           case MovedToStep(phase) =>
@@ -219,23 +213,30 @@ object Engine {
           // TODO: Ability
           case Stacked(id, player, args) =>
             state.getCard(id) match {
-              case Some((_, UnPlayed(_: Land, _))) => state
-              case Some((zone, _)) => state.moveCard(id, player, zone, Stack, args)
               case None => state
+              case Some(result) => result match {
+                case (_, UnPlayed(_: Land, _)) => state
+                case (zone, _) => state.moveCard(id, player, zone, Stack, args)
+              }
             }
 
-          // TODO: EnterTheBattlefield also for Land. LandPlayed = remove 1 to number of land played counter
           case LandPlayed(id, player) =>
             state.getCard(id) match {
-              case Some((zone, UnPlayed(_:Land, _))) =>
-                state.moveCard(id, player, zone, Battlefield).modifyPlayer(player, p => p.copy(landsToPlay = p.landsToPlay - 1))
-              case _ => state
+              case None => state
+              case Some(result) => result match {
+                case (_, UnPlayed(_: Land, _)) =>
+                  state.modifyPlayer(player, p => p.copy(landsToPlay = p.landsToPlay - 1))
+                case (_, _) => state
+              }
             }
 
           case EnteredTheBattlefield(id) =>
             state.getCard(id) match {
-              case Some((zone, s)) if s.card.isInstanceOf[PermanentCard] => state.moveCard(id, s.owner, zone, Battlefield)
-              case _ => state
+              case None => state
+              case Some(result) => result match {
+                case (zone, s) if s.card.isInstanceOf[PermanentCard] => state.moveCard(id, s.owner, zone, Battlefield)
+                case (_, _) => state
+              }
             }
 
           // TODO: Should move instances to the combat zone

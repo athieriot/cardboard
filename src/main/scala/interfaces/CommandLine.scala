@@ -60,7 +60,7 @@ object CommandLine {
           val playerTwo = lineReader.readLine("Player Two: ")
 
           val players = Map(
-            playerOne -> greenDeck,
+            playerOne -> izzetDeck,
             playerTwo -> blueDeck
           )
 
@@ -135,8 +135,8 @@ object CommandLine {
       .terminal(terminal)
       .completer(new TreeCompleter(
         node("read", node(collection.map(c => renderArg(c._1, c._2.card)).toList: _*)),
-        if !state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isInstanceOf[Land]) then node("play") else node("play", node(state.listCardsFromZone(Hand(state.priority)).filter(_._2.card.isInstanceOf[Land]).map(c => renderArg(c._1, c._2.card)).toList: _*)),
-        if state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isInstanceOf[Land]) then node("cast") else node("cast", node(state.listCardsFromZone(Hand(state.priority)).filterNot(_._2.card.isInstanceOf[Land]).map(c => renderArg(c._1, c._2.card)).toList: _*)),
+        if !state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isLand) then node("play") else node("play", node(state.listCardsFromZone(Hand(state.priority)).filter(_._2.card.isLand).map(c => renderArg(c._1, c._2.card)).toList: _*)),
+        if state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isLand) then node("cast") else node("cast", node(state.listCardsFromZone(Hand(state.priority)).filterNot(_._2.card.isLand).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         if state.potentialAttackers(state.priority).isEmpty then node("attack") else node("attack", node(state.potentialAttackers(state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         // TODO: TreeCompleter for blockers
         // TODO: ArgCompleter for arg targets
@@ -160,14 +160,14 @@ object CommandLine {
     // TODO: Show each types (Artefacts, Enchantments, Planeswalkers) on a different line
     println(s"| ✋ Hand (${playerOne._2.hand.size}): ${playerOne._2.hand.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
     println("|------------------")
-    println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
+    println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isLand).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerOne._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
     println("|")
     if state.stack.nonEmpty then println(s"| 🎴Stack: ${state.stack.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
     if state.combatZone.nonEmpty then println(s"| ⚠ Attack: ${state.combatZone.map(p => s"${renderName(p._1, p._2.attacker.card)}->${p._2.blockers.map(b => renderName(b._1, b._2.card)).mkString(", ")}->${p._2.target}").mkString(", ")}")
     println("|")
     println(s"| 🦁 Creatures: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isCreature).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}${renderSummoningSickness(p._2)}").mkString(", ")}")
-    println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isInstanceOf[Land]).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
+    println(s"| 🌳 Lands: ${state.battleField.filter(_._2.controller == playerTwo._1).filter(_._2.card.isLand).map(p => s"${renderName(p._1, p._2.card)}${renderStatus(p._2)}").mkString(", ")}")
     println("|------------------")
     println(s"| ✋ Hand (${playerTwo._2.hand.size}): ${playerTwo._2.hand.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
 
@@ -214,7 +214,7 @@ object CommandLine {
 
         card.card match {
           case permanent: PermanentCard => s"(${permanent.basePower.getOrElse(0)}/${permanent.baseToughness.getOrElse(0)})"
-          case _ => ""
+          case _ =>
         }
     }
   }

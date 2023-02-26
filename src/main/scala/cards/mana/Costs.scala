@@ -4,13 +4,6 @@ import cards.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 
-// TODO: Could also have a "condition"
-case class Ability(
-  cost: AbilityCost,
-  text: String,
-  effect: (BoardState, String) => List[Event]
-)
-
 trait AbilityCost {
   // TODO: Feel like the id should be on the Ability instance
   def canPay(card: Card|Permanent[PermanentCard]): Boolean

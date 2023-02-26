@@ -17,12 +17,8 @@ import scala.util.Try
   )
 )
 sealed abstract class Instant extends Card {
-  // TODO: I think it has to be a list of Conditions
-  def checkCastingConditions(ctx: Context): Try[Unit] = Try {
-    if !cost.canPay(ctx.state, ctx.player) then
-      throw new RuntimeException("Cannot pay the cost")
-  }
-  // TODO: Do we need an "overridableCheckCondition"
+  override def checkCastingConditions(ctx: Context): Try[Unit] = super.checkCastingConditions(ctx)
+  
   def effects(id: CardId, ctx: Context): List[Event] = List(PutIntoGraveyard(id, ctx.player))
 }
 
@@ -32,10 +28,8 @@ class Counterspell(val set: MagicSet, val numberInSet: Int) extends Instant {
   val color: Color = Color.blue
   val cost: CastingCost = ManaCost("UU")
 
-  // TODO: Check condition = Target still valid
-
   override def checkCastingConditions(ctx: Context): Try[Unit] = super.checkCastingConditions(ctx).flatMap { _ => Try {
-    // TODO: Extract in a "CounterCondition"
+    // TODO: Extract in a "CounterCondition" ?
     ctx.args.find(_.isInstanceOf[TargetArg]) match {
       case None => throw new RuntimeException("Please specify a target")
       case Some(TargetArg(target)) =>

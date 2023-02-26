@@ -34,7 +34,7 @@ case class ManaPool(pool: Map[Color, Int] = Color.values.map((_, 0)).toMap) {
   @targetName("minusText")
   def -(cost: ManaCost): Try[ManaPool] = Try {
     cost.text.foldRight(this) { (c, manaPool) =>
-      manaPool - (Color.colorFrom(c), if c.isDigit then c.toInt else 1) match {
+      manaPool - (Color.colorFrom(c), if c.isDigit then c.asDigit else 1) match {
         case Success(value) => value
         case Failure(ex) => throw ex
       }
