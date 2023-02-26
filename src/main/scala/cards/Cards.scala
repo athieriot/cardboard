@@ -23,7 +23,11 @@ case class Spell[T <: Card](
   card: T,
   owner: String,
   controller: String,
-) extends CardState[T]
+  args: List[Arg[_]] = List.empty
+) extends CardState[T] {
+  
+  def effects(id: CardId, ctx: Context): List[Event] = card.effects(id, ctx, this)
+}
 
 case class Permanent[T <: PermanentCard](
   card: T,
@@ -32,6 +36,7 @@ case class Permanent[T <: PermanentCard](
   status: Status = Status.Untapped,
   firstTurn: Boolean = true,
   damages: Int = 0,
+  args: List[Arg[_]] = List.empty
 ) extends CardState[T] {
   def hasSummoningSickness: Boolean = card.isCreature && !card.keywordAbilities.contains(KeywordAbilities.haste) && firstTurn
 
@@ -40,7 +45,7 @@ case class Permanent[T <: PermanentCard](
 
   def tap: Permanent[T] = this.copy(status = Status.Tapped)
   def unTap: Permanent[T] = this.copy(status = Status.Untapped)
-  
+
   def takeDamage(amount: Int): Permanent[T] = this.copy(damages = damages - amount)
 }
 
@@ -66,9 +71,9 @@ abstract class Card {
   val set: MagicSet
   val numberInSet: Int
 
-  def checkConditions(state: BoardState, player: PlayerId): Try[Unit]
-  def effects(id: CardId, state: BoardState, player: PlayerId): List[Event]
-  
+  def checkCastingConditions(ctx: Context): Try[Unit]
+  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event]
+
   def keywordAbilities: List[KeywordAbilities] = List.empty
   def activatedAbilities: Map[Int, Ability] = Map.empty
 

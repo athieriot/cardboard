@@ -9,7 +9,7 @@ sbt run
 # Next
 
 - Abilities on the Stack
-- Extract Context / "CommandController"
+- Implement more of "persistEvents"
 - Refactor CombatZone
 - Improve Priority handling by implementing "Pass"
 - Tests !

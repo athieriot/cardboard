@@ -32,7 +32,14 @@ object CommandLine {
 
   private val terminal: Terminal = TerminalBuilder.terminal
   private var lineReader: LineReader = LineReaderBuilder.builder().terminal(terminal).build()
-
+  
+  private def parseArg(x: String): Option[Arg[_]] = {
+    x.replaceAll("-", "").split("=").toList match {
+      case "target" :: y :: Nil => Some(TargetArg(y.toInt))
+      case _ => None
+    }
+  }
+  
   def apply(instance: Behavior[Action]): Behavior[Status] =
     Behaviors.setup[CommandLine.Status] { context =>
       implicit val timeout: Timeout = 3.seconds
@@ -53,8 +60,8 @@ object CommandLine {
           val playerTwo = lineReader.readLine("Player Two: ")
 
           val players = Map(
-            playerOne -> standardDeck,
-            playerTwo -> standardDeck
+            playerOne -> greenDeck,
+            playerTwo -> blueDeck
           )
 
           SendAction(context, cardboard, ref => New(ref, players), {
@@ -70,17 +77,19 @@ object CommandLine {
             context.self ! Terminate
             Behaviors.same
           else
+            // TODO: "cmd+n" for next ?
+            // TODO: Skip only in cli: automate phase/resolution if not exceptions
             val actionOpt = inputs match {
               case "read" :: _ :: Nil => Some(Recover.apply)
-              case "play" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, priority, readIdFromArg(target)))
-              case "cast" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, priority, readIdFromArg(target)))
-              case "attack" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareAttacker(ref, priority, readIdFromArg(target)))
-              case "block" :: target :: block :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareBlocker(ref, priority, readIdFromArg(target), readIdFromArg(block)))
-              case "activate" :: target :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(target), abilityId.toInt))
-              case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, None))
-              case "next" :: "skip" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority, Some(true)))
+              case "play" :: id :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, priority, readIdFromArg(id)))
+              case "cast" :: id :: args => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, priority, readIdFromArg(id), args.flatMap(parseArg)))
+              case "attack" :: id :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareAttacker(ref, priority, readIdFromArg(id)))
+              case "block" :: id :: block :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareBlocker(ref, priority, readIdFromArg(id), readIdFromArg(block)))
+              case "activate" :: id :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(id), abilityId.toInt))
+              case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority))
+              case "resolve" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Resolve(ref, priority))
               case "end" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => EndTurn(ref, priority))
-              case "discard" :: target :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, priority, readIdFromArg(target)))
+              case "discard" :: id :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Discard(ref, priority, readIdFromArg(id)))
               case _ => println("I don't understand your action"); context.self ! Ready(priority); None
             }
 
@@ -130,6 +139,7 @@ object CommandLine {
         if state.listCardsFromZone(Hand(state.priority)).exists(_._2.card.isInstanceOf[Land]) then node("cast") else node("cast", node(state.listCardsFromZone(Hand(state.priority)).filterNot(_._2.card.isInstanceOf[Land]).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         if state.potentialAttackers(state.priority).isEmpty then node("attack") else node("attack", node(state.potentialAttackers(state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         // TODO: TreeCompleter for blockers
+        // TODO: ArgCompleter for arg targets
         if !state.battleField.exists(_._2.owner == state.priority) then node("activate") else node("activate", node(state.battleField.filter(_._2.owner == state.priority).map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("discard", node(state.players(state.priority).hand.map(c => renderArg(c._1, c._2.card)).toList: _*)),
         node("next"),
@@ -140,7 +150,7 @@ object CommandLine {
   }
 
   private def render(state: BoardState): Unit = {
-//    refreshAutoComplete(state)
+    refreshAutoComplete(state)
 
     println("\n")
     val playerOne = state.players.head
@@ -187,9 +197,9 @@ object CommandLine {
   private def renderSummoningSickness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature && permanent.hasSummoningSickness then s"[S]${renderPowerToughness(permanent)}" else renderPowerToughness(permanent)
   private def renderPowerToughness(permanent: Permanent[PermanentCard]): String = if permanent.card.isCreature then s"(${permanent.power}/${permanent.toughness})" else ""
 
-  private def renderCard(state: BoardState, target: CardId): Unit = {
+  private def renderCard(state: BoardState, id: CardId): Unit = {
 
-    buildCollection(state).get(target) match {
+    buildCollection(state).get(id) match {
       case None => println("Card not found")
       case Some(card) =>
         println(s"|Name: ${card.card.name}")
@@ -204,6 +214,7 @@ object CommandLine {
 
         card.card match {
           case permanent: PermanentCard => s"(${permanent.basePower.getOrElse(0)}/${permanent.baseToughness.getOrElse(0)})"
+          case _ => ""
         }
     }
   }

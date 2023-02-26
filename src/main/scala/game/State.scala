@@ -17,7 +17,7 @@ import scala.annotation.targetName
 
 type CardId = Int
 type PlayerId = String
-type Target = CardId|PlayerId
+type TargetId = CardId|PlayerId
 
 case class PlayerState(
   library: Map[CardId, UnPlayed[Card]],
@@ -36,7 +36,7 @@ case class PlayerState(
 // TODO: Have a way to reassign order and amount of damages when more than one blocker
 case class CombatZoneEntry(
   attacker: Permanent[PermanentCard],
-  target: Target,
+  target: TargetId,
   blockers: Map[CardId, Permanent[PermanentCard]] = Map.empty,
 )
 
@@ -78,11 +78,11 @@ case class BoardState(
   def getCard(id: CardId): Option[(Zone[CardState[Card]], CardState[Card])] = cardsZone.get(id).flatMap(zone => getCardFromZone(id, zone).map((zone, _)))
   def getCardOwner(id: CardId): Option[String] = getCard(id).map(_._2.owner)
   // TODO: Top or Bottom ?
-  def moveCards[A <: CardState[Card]](ids: List[CardId], by: PlayerId, origin: Zone[A], destination: Zone[A]): BoardState =
+  def moveCards[A <: CardState[Card]](ids: List[CardId], by: PlayerId, origin: Zone[A], destination: Zone[A], args: List[Arg[_]] = List.empty): BoardState =
     ids.foldRight(this) { case (id, state) => state.moveCard(id, by, origin, destination) }
-  def moveCard[A <: CardState[Card], B <: CardState[Card]](id: CardId, by: PlayerId, origin: Zone[A], destination: Zone[B]): BoardState = getCardFromZone(id, origin) match {
+  def moveCard[A <: CardState[Card], B <: CardState[Card]](id: CardId, by: PlayerId, origin: Zone[A], destination: Zone[B], args: List[Arg[_]] = List.empty): BoardState = getCardFromZone(id, origin) match {
     case Some(card) =>
-      focusOnZone(destination).modify(_ + (id -> destination.convert(by, card)))
+      focusOnZone(destination).modify(_ + (id -> destination.convert(by, card, args)))
         .focus(_.cardsZone).modify(_.updated(id, destination.asInstanceOf[Zone[CardState[Card]]]))
         .focusOnZone(origin).modify(_.removed(id))
     case None => this

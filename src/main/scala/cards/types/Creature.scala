@@ -16,17 +16,18 @@ import scala.util.Try
   )
 )
 sealed abstract class Creature extends PermanentCard {
-  def checkConditions(state: BoardState, player: PlayerId): Try[Unit] = Try {
-    if state.activePlayer != player then
+  // TODO: Split catching condition to be able to override some of them
+  def checkCastingConditions(ctx: Context): Try[Unit] = Try {
+    if ctx.state.activePlayer != ctx.player then
       throw new RuntimeException("You can only play creatures during your turn")
-    else if !state.currentStep.isMain then
+    else if !ctx.state.currentStep.isMain then
       throw new RuntimeException("You can only play creatures during a main phase")
-    else if state.stack.nonEmpty then
+    else if ctx.state.stack.nonEmpty then
       throw new RuntimeException("You can only play creatures when the stack is empty")
-    else if !cost.canPay(state, player) then
+    else if !cost.canPay(ctx.state, ctx.player) then
       throw new RuntimeException("Cannot pay the cost")
   }
-  def effects(id: CardId, state: BoardState, player: PlayerId): List[Event] = List(EnteredTheBattlefield(id))
+  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(EnteredTheBattlefield(id))
 }
 
 class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
@@ -38,7 +39,7 @@ class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val baseToughness: Option[Int] = Some(1)
   
   // TODO: Effect = ETB
-  def activatedAbilities: Map[Int, Ability] = Map(
+  override def activatedAbilities: Map[Int, Ability] = Map(
     1 -> Ability(Tap, "Add one green mana", (_, player) => List(ManaAdded(Map(Color.green -> 1), player)))
   )
 }

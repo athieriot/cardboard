@@ -25,31 +25,6 @@ object Engine {
   private val OPENING_HAND = 7
   private val MAX_HAND_SIZE = 7
 
-  private case class Context(replyTo: ActorRef[StatusReply[State]], state: BoardState, player: PlayerId)
-
-  private def parseContext(replyTo: ActorRef[StatusReply[State]], state: BoardState, player: PlayerId)(block: Context => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
-    block(Context(replyTo, state, player))
-
-  // TODO: Have a wrapper to fetch Target once we have "from" parameter
-  private def checkPriority(ctx: Context)(block: => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
-    if ctx.state.priority == ctx.player then
-      block
-    else
-      Effect.none.thenReply(ctx.replyTo)(_ => StatusReply.Error(s"${ctx.player} does not have priority"))
-
-  private def checkStep(ctx: Context, step: Step)(block: => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
-    if ctx.state.currentStep == step then
-      block
-    else
-      Effect.none.thenReply(ctx.replyTo)(_ => StatusReply.Error(s"Action only available during ${step.toString}"))
-
-  private def persistEvents(ctx: Context)(block: => Try[List[Event]]): ReplyEffect[Event, State] = {
-    block match {
-      case Success(events) => Effect.persist(triggersHandler(ctx.state, events)).thenReply(ctx.replyTo)(state => StatusReply.Success(state))
-      case Failure(message) => Effect.none.thenReply(ctx.replyTo)(_ => StatusReply.Error(message))
-    }
-  }
-
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     state match {
       case EndState(_) => Effect.noReply
@@ -76,109 +51,107 @@ object Engine {
 
           case PlayLand(replyTo, player, id) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) {
             persistEvents(ctx) {
-              state.getCard(id) match {
-                case Some((zone: PlayerZone, UnPlayed(land: Land, _))) if zone.isOf(player) =>
-                  land.checkConditions(state, player).map(_ => land.effects(id, state, player))
-                case _ => Try(throw new RuntimeException("Land not found in your player zones"))
+              // TODO: One day implement play from Graveyard
+              state.getCardFromZone(id, Hand(player)) match {
+                case Some(UnPlayed(land: Land, owner)) =>
+                  land.checkCastingConditions(ctx).map(_ => land.effects(id, ctx, UnPlayed(land, owner)))
+                case _ => Try(throw new RuntimeException("Land not found"))
               }
             }
           }}
 
-          case Cast(replyTo, player, target) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { // Player Wrapper
-            state.getCardFromZone(target, Hand(player)) match {
-              // TODO: There can be alternative costs also
-              case Some(cardState) => cardState.card.checkConditions(state, player) match {
-                case Success(_) => Effect.persist(triggersHandler(state, cardState.card.cost.pay(target, player) ++ List(Stacked(target, player), PriorityPassed(state.nextPriority)))).thenReply(replyTo)(state => StatusReply.Success(state))
-                case Failure(message) => Effect.none.thenReply(replyTo)(_ => StatusReply.Error(message))
+          case Cast(replyTo, player, id, args) => parseContext(replyTo, state, player, args) { ctx => checkPriority(ctx) { // Player Wrapper
+            persistEvents(ctx) {
+              state.getCardFromZone(id, Hand(player)) match {
+                case Some(UnPlayed(card, _)) => card.checkCastingConditions(ctx).map { _ =>
+                  // TODO: There can be alternative costs also
+                  card.cost.pay(id, player) ++ List(Stacked(id, player, args), PriorityPassed(state.nextPriority))
+                }
+                case None => Try(throw new RuntimeException("Card not found"))
               }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
             }
           }}
+
           // TODO: Only non-Mana Abilities go on the Stack
-          case Activate(replyTo, player, target, abilityId) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { // Player Wrapper
-            state.battleField.filter(_._2.owner == player).get(target) match {
+          case Activate(replyTo, player, id, abilityId) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { // Player Wrapper
+            state.battleField.filter(_._2.owner == player).get(id) match {
               case Some(permanent) =>
                 permanent.card.activatedAbilities.get(abilityId) match {
                   case Some(ability) =>
                     if ability.cost.canPay(permanent) then
-                      Effect.persist(triggersHandler(state, ability.cost.pay(target, player) ++ ability.effect(state, player))).thenReply(replyTo)(state => StatusReply.Success(state))
+                      Effect.persist(triggersHandler(state, ability.cost.pay(id, player) ++ ability.effect(state, player))).thenReply(replyTo)(state => StatusReply.Success(state))
                     else
                       Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
                   case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Abilities not found"))
                 }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
             }
           }}
 
           // TODO: Have a round of priority after
-          case DeclareAttacker(replyTo, player, target) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.declareAttackers) {
-            state.potentialAttackers(player).get(target) match {
+          case DeclareAttacker(replyTo, player, id) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.declareAttackers) {
+            state.potentialAttackers(player).get(id) match {
               case Some(_) =>
-                Effect.persist(triggersHandler(state, List(Tapped(target), AttackerDeclared(target)))).thenReply(replyTo)(state => StatusReply.Success(state))
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+                Effect.persist(triggersHandler(state, List(Tapped(id), AttackerDeclared(id)))).thenReply(replyTo)(state => StatusReply.Success(state))
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
             }
           }}}
 
           // TODO: Multiple blockers
           // TODO: Would not work for 4 Players
-          case DeclareBlocker(replyTo, player, target, blocker) => parseContext(replyTo, state, player) { ctx => checkStep(ctx, Step.declareBlockers) {
+          case DeclareBlocker(replyTo, player, id, blocker) => parseContext(replyTo, state, player) { ctx => checkStep(ctx, Step.declareBlockers) {
             state.potentialBlockers(state.nextPlayer).get(blocker) match {
               case Some(_) =>
-                state.combatZone.get(target) match {
-                  case Some(_) => Effect.persist(triggersHandler(state, List(BlockerDeclared(target, blocker)))).thenReply(replyTo)(state => StatusReply.Success(state))
+                state.combatZone.get(id) match {
+                  case Some(_) => Effect.persist(triggersHandler(state, List(BlockerDeclared(id, blocker)))).thenReply(replyTo)(state => StatusReply.Success(state))
                   case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
                 }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
             }
           }}
 
           // TODO: Apparently there is a round of priority after declare attacker/blockers
           // TODO: Need to find a way to do that round of priority each step
-          case Next(replyTo, player, skip: Option[Boolean]) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) {
-            persistEvents(ctx) {
-              if state.stack.isEmpty then
-                Try {
-                  val stepsCountUntilEnd = skip.filter(_ == true).map(_ => Step.values.length - Step.values.indexOf(state.currentStep) - 1).getOrElse(1)
-                  val activePlayer = state.activePlayer
-                  (1 to stepsCountUntilEnd).foldLeft((state: State, List.empty[Event])) { case ((stateAcc, events), _) =>
-                    state match {
-                      case state: BoardState =>
-                        val newEvents = Try(state.currentStep.next()) match {
-                          case Success(nextPhase) => triggersHandler(state, List(MovedToStep(nextPhase), PriorityPassed(activePlayer)))
-                          case Failure(_) => List.empty
-                        }
-                        val newState = newEvents.foldLeft(stateAcc)(eventHandler(_, _))
-
-                        (newState, events ++ newEvents)
-                    }
-                  }._2
-                }
+          case Next(replyTo, player) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) {
+            persistEvents(ctx) { Try {
+              if state.stack.nonEmpty then
+                throw new RuntimeException("Cannot go to next phase until the stack is empty")
               else
-                // Resolve the stack
-                Try {
-                  
-                  // TODO: Take first one => Resolve => repeat
-                  // TODO: Stop when stack is empty
-                  // TODO: Real target is the one you have to choose on cast => Rename Target to Id then take an extra parameter
-                  
-                  // TODO: Should stop when a spell need interaction
-                  // TODO: Actually Resolve would help to stop card by card
-                  state.listCardsFromZone(Stack).toList.reverse
-                    .flatMap { case (id, spell) => spell.card.effects(id, state, player) }
-                    .concat(List(PriorityPassed(state.activePlayer)))
+                List(
+                  MovedToStep(state.currentStep.next()),
+                  PriorityPassed(state.activePlayer)
+                )
+            }}
+          }}
+          case Resolve(replyTo, player) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) {
+            persistEvents(ctx) {
+              Try {
+                // TODO: Stop when stack is empty
+                // TODO: Real target is the one you have to choose on cast => Rename Target to Id then take an extra parameter
+
+                // TODO: Should stop/print a message when a spell need interaction
+                state.listCardsFromZone(Stack).toList.reverse match {
+                  case Nil => throw new RuntimeException("Nothing to resolve. You can go to next phase")
+                  case (id, spell) :: tail => spell.effects(id, ctx) ++ (tail match {
+                    case Nil => List(PriorityPassed(state.activePlayer))
+                    case (_, nextSpell: Spell[_]) :: _ if nextSpell.controller != state.priority => List(PriorityPassed(state.nextPriority))
+                    case _ => List()
+                  })
                 }
+              }
             }
           }}
-          case Discard(replyTo, player, target) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.cleanup) {
-            state.players(player).hand.get(target) match {
+
+          case Discard(replyTo, player, id) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.cleanup) {
+            state.players(player).hand.get(id) match {
               case Some(_) =>
                 state.players(player).hand match {
                   case hand if hand.size > MAX_HAND_SIZE =>
-                    Effect.persist(triggersHandler(state, List(Discarded(target, player)))).thenReply(replyTo)(state => StatusReply.Success(state))
+                    Effect.persist(triggersHandler(state, List(Discarded(id, player)))).thenReply(replyTo)(state => StatusReply.Success(state))
                   case hand if hand.size <= MAX_HAND_SIZE =>
                     Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Hand size does not exceed maximum, you can EndTurn"))
                 }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Target not found"))
+              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
             }
           }}}
           case EndTurn(replyTo, player) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.cleanup) {
@@ -244,39 +217,40 @@ object Engine {
           case ManaPaid(manaCost, player) => state.focusOnManaPool(player).modify(mp => (mp - manaCost).get)
 
           // TODO: Ability
-          case Stacked(target, player) =>
-            state.getCard(target) match {
+          case Stacked(id, player, args) =>
+            state.getCard(id) match {
               case Some((_, UnPlayed(_: Land, _))) => state
-              case Some((zone, _)) => state.moveCard(target, player, zone, Stack)
+              case Some((zone, _)) => state.moveCard(id, player, zone, Stack, args)
               case None => state
             }
 
-          case LandPlayed(target, player) =>
-            state.getCard(target) match {
+          // TODO: EnterTheBattlefield also for Land. LandPlayed = remove 1 to number of land played counter
+          case LandPlayed(id, player) =>
+            state.getCard(id) match {
               case Some((zone, UnPlayed(_:Land, _))) =>
-                state.moveCard(target, player, zone, Battlefield).modifyPlayer(player, p => p.copy(landsToPlay = p.landsToPlay - 1))
+                state.moveCard(id, player, zone, Battlefield).modifyPlayer(player, p => p.copy(landsToPlay = p.landsToPlay - 1))
               case _ => state
             }
 
-          case EnteredTheBattlefield(target) =>
-            state.getCard(target) match {
-              case Some((zone, s)) if s.card.isInstanceOf[PermanentCard] => state.moveCard(target, s.owner, zone, Battlefield)
+          case EnteredTheBattlefield(id) =>
+            state.getCard(id) match {
+              case Some((zone, s)) if s.card.isInstanceOf[PermanentCard] => state.moveCard(id, s.owner, zone, Battlefield)
               case _ => state
             }
 
           // TODO: Should move instances to the combat zone
-          case AttackerDeclared(target) =>
-            state.battleField.get(target) match {
+          case AttackerDeclared(id) =>
+            state.battleField.get(id) match {
               // TODO
-              case Some(permanent) => state.focus(_.combatZone).modify(_ + (target -> CombatZoneEntry(permanent, state.nextPlayer)))
+              case Some(permanent) => state.focus(_.combatZone).modify(_ + (id -> CombatZoneEntry(permanent, state.nextPlayer)))
               case None => state
             }
 
             // TODO: Naming !
-          case BlockerDeclared(target, blocker) =>
+          case BlockerDeclared(id, blocker) =>
             // TODO
-            (state.combatZone.get(target), state.battleField.get(blocker)) match {
-              case (Some(_), Some(card)) => state.focus(_.combatZone.index(target).blockers).modify(_ + (blocker -> card))
+            (state.combatZone.get(id), state.battleField.get(blocker)) match {
+              case (Some(_), Some(card)) => state.focus(_.combatZone.index(id).blockers).modify(_ + (blocker -> card))
               case _ => state
             }
 
@@ -284,16 +258,16 @@ object Engine {
             val topXCards = state.listCardsFromZone(Library(player)).take(amount)
             state.moveCards(topXCards.keys.toList, player, Library(player), Hand(player))
 
-          case DamageDealt(target, amount) =>
-            target match {
-              case id: CardId                   => state.modifyCardFromZone(id, Battlefield, _.takeDamage(amount))
-              case player: PlayerId             => state.modifyPlayer(player, _.takeDamage(amount))
+          case DamageDealt(id, amount) =>
+            id match {
+              case cardId: CardId           => state.modifyCardFromZone(cardId, Battlefield, _.takeDamage(amount))
+              case player: PlayerId         => state.modifyPlayer(player, _.takeDamage(amount))
             }
-          case Discarded(target, player)        => state.moveCard(target, player, Hand(player), Graveyard(state.getCardOwner(target).getOrElse(player)))
-          case Destroyed(target, player)        => state.moveCard(target, player, Battlefield, Graveyard(state.getCardOwner(target).getOrElse(player)))
-          case PutIntoGraveyard(target, player) => state.moveCard(target, player, Stack, Graveyard(state.getCardOwner(target).getOrElse(player)))
-          case Tapped(target)                   => state.modifyCardFromZone(target, Battlefield, _.tap)
-          case Untapped                         => state.modifyAllCardsFromZone(Battlefield, _.unTap)
+          case Discarded(id, player)        => state.moveCard(id, player, Hand(player), Graveyard(state.getCardOwner(id).getOrElse(player)))
+          case Destroyed(id, player)        => state.moveCard(id, player, Battlefield, Graveyard(state.getCardOwner(id).getOrElse(player)))
+          case PutIntoGraveyard(id, player) => state.moveCard(id, player, Stack, Graveyard(state.getCardOwner(id).getOrElse(player)))
+          case Tapped(id)                   => state.modifyCardFromZone(id, Battlefield, _.tap)
+          case Untapped                     => state.modifyAllCardsFromZone(Battlefield, _.unTap)
 
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }

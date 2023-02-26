@@ -11,12 +11,17 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
 }
 
 enum MagicSet(val code: String) {
-  case AllWillBeOne extends MagicSet("one")
-  case CoreSet2019 extends MagicSet("m19")
+  case FourthEdition extends MagicSet("4ed")
 }
 
-val standardDeck: Deck =
+val greenDeck: Deck =
   Deck(
-    (1 to 30).map(_ => Forest(AllWillBeOne, 276)).toList
-      ++ (1 to 30).map(_ => LlanowarElf(CoreSet2019, 314))
+    (1 to 30).map(_ => Forest(FourthEdition, 376)).toList
+      ++ (1 to 30).map(_ => LlanowarElf(FourthEdition, 261))
+  )
+
+val blueDeck: Deck =
+  Deck(
+    (1 to 30).map(_ => Island(FourthEdition, 367)).toList
+      ++ (1 to 30).map(_ => Counterspell(FourthEdition, 65))
   )
