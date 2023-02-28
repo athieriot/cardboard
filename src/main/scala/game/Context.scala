@@ -3,12 +3,25 @@ package game
 import akka.actor.typed.ActorRef
 import akka.pattern.StatusReply
 import akka.persistence.typed.scaladsl.{Effect, ReplyEffect}
+import cards.types.{LlanowarElf, MonssGoblinRaiders, ProdigalSorcerer}
+import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.mechanics.Step
 import game.mechanics.Triggers.triggersHandler
 
 import scala.util.{Failure, Success, Try}
 
 case class Context(replyTo: ActorRef[StatusReply[State]], state: BoardState, player: PlayerId, args: List[Arg[_]])
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+@JsonSubTypes(
+  Array(
+    new JsonSubTypes.Type(value = classOf[TargetArg], name = "target"),
+  )
+)
+sealed trait Arg[T] { def value: T }
+// TODO: Should be Map[ArgName, CardId] ?
+// TODO: Method retrieveTarget
+case class TargetArg(value: TargetId) extends Arg[TargetId]
 
 private def parseContext(replyTo: ActorRef[StatusReply[State]], state: BoardState, player: PlayerId, args: List[Arg[_]] = List.empty)(block: Context => ReplyEffect[Event, State]): ReplyEffect[Event, State] =
   block(Context(replyTo, state, player, args))

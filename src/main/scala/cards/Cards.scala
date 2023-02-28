@@ -17,34 +17,42 @@ import scala.util.Try
     new JsonSubTypes.Type(value = classOf[Land], name = "land"),
     new JsonSubTypes.Type(value = classOf[Creature], name = "creature"),
     new JsonSubTypes.Type(value = classOf[Instant], name = "instant"),
+    new JsonSubTypes.Type(value = classOf[Token], name = "token"),
   )
 )
 abstract class Card {
-  val name: String
-  val subTypes: List[String]
-  val color: Color
-  // Some cards have no mana cost (Ex: Suspend)
-  val cost: CastingCost
-  val set: MagicSet
-  val numberInSet: Int
+  def name: String
+  def subTypes: List[String]
+  def color: Color
+  def cost: Cost
+  def set: MagicSet
+  def numberInSet: Int
 
-  def checkCastingConditions(ctx: Context): Try[Unit] =
-    Try(if !cost.canPay(ctx.state, ctx.player) then
-      throw new RuntimeException("Cannot pay the cost"))
-
+  // TODO: That should probably be a list
+  def conditions(ctx: Context): Try[Unit]
   def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event]
 
+  // TODO: Part of permanent ?
   // TODO: Maybe all those should be on the CardState classes
   def keywordAbilities: List[KeywordAbilities] = List.empty
   def activatedAbilities: Map[Int, Ability] = Map.empty
 
-  def isLand: Boolean     = isInstanceOf[Land] || subTypes.contains("Land") || subTypes.contains("Legendary Land")
-  def isCreature: Boolean = isInstanceOf[Creature] || subTypes.contains("Creature") || subTypes.contains("Legendary Creature")
+  def isLand: Boolean     = isInstanceOf[Land] || subTypes.exists(_.contains("Land"))
+  def isCreature: Boolean = isInstanceOf[Creature] || subTypes.exists(_.contains("Creature"))
+  def isToken: Boolean = isInstanceOf[Token] || subTypes.exists(_.contains("Token"))
 
   def preview: URL = {
     new URL(s"https://scryfall.com/card/${set.code}/$numberInSet/${name.replace(" ", "-").replace("'", "").toLowerCase}")
   }
 }
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+@JsonSubTypes(
+  Array(
+    new JsonSubTypes.Type(value = classOf[AbilityToken], name = "ability"),
+  )
+)
+trait Token extends Card
 
 abstract class PermanentCard extends Card {
   val basePower: Option[Int]

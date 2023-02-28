@@ -14,17 +14,13 @@ sealed trait Action {
   val replyTo: ActorRef[StatusReply[State]]
 }
 
-sealed trait Arg[T] { def value: T }
-// TODO: Should be Map[ArgName, CardId]
-case class TargetArg(value: CardId) extends Arg[CardId]
-
 // Game initialisation
 final case class Recover(replyTo: ActorRef[StatusReply[State]]) extends Action
 final case class New(replyTo: ActorRef[StatusReply[State]], players: Map[String, Deck]) extends Action
 
-final case class PlayLand(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId) extends Action
+final case class PlayLand(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId, args: List[Arg[_]]) extends Action
 final case class Cast(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId, args: List[Arg[_]]) extends Action
-final case class Activate(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId, abilityId: Int) extends Action
+final case class Activate(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId, abilityId: Int, args: List[Arg[_]]) extends Action
 
 final case class DeclareAttacker(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId) extends Action
 final case class DeclareBlocker(replyTo: ActorRef[StatusReply[State]], player: PlayerId, id: CardId, blocker: CardId) extends Action
@@ -53,6 +49,7 @@ case object Untapped extends TurnBaseEvent
 case object CombatEnded extends TurnBaseEvent
 
 final case class Stacked(id: CardId, player: PlayerId, args: List[Arg[_]]) extends Event
+final case class StackedAbility(id: CardId, abilityId: Int, player: PlayerId, args: List[Arg[_]]) extends Event
 final case class LandPlayed(id: CardId, player: PlayerId) extends Event
 final case class EnteredTheBattlefield(id: CardId) extends Event
 final case class PutIntoGraveyard(id: CardId, player: PlayerId) extends Event

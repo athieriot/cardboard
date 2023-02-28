@@ -46,11 +46,11 @@ case class ManaPool(pool: Map[Color, Int] = Color.values.map((_, 0)).toMap) {
     (1 to mana._2).foldLeft(this) { case (manaPool, _) =>
       mana._1 match {
         case Some(color) if manaPool.pool.getOrElse(color, 0) > 0 => manaPool.focus(_.pool.index(color)).modify(_ - 1)
-        case Some(_) => throw new RuntimeException("No enough mana available")
+        case Some(_) => throw new RuntimeException("No enough mana in your mana pool")
         case None =>
           manaPool.pool.find(_._2 > 0) match {
             case Some((color, _)) => manaPool.focus(_.pool.index(color)).modify(_ - 1)
-            case None => throw new RuntimeException("No enough mana available")
+            case None => throw new RuntimeException("No enough mana in your mana pool")
           }
       }
     }

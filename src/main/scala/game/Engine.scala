@@ -50,12 +50,12 @@ object Engine {
         command match {
           case Recover(replyTo) => Effect.none.thenReply(replyTo)(state => StatusReply.Success(state))
 
-          case PlayLand(replyTo, player, id) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) {
+          case PlayLand(replyTo, player, id, args) => parseContext(replyTo, state, player, args) { ctx => checkPriority(ctx) {
             persistEvents(ctx) {
               // TODO: One day implement play from Graveyard
-              state.getCardFromZone(id, Hand(player)) match {
-                case Some(UnPlayed(land: Land, owner)) =>
-                  land.checkCastingConditions(ctx).map(_ => land.effects(id, ctx, UnPlayed(land, owner)))
+              state.getCardFromZone(id, Hand(player)).filter(_.card.isLand) match {
+                case Some(land) =>
+                  land.checkConditions(ctx).map(_ =>  land.card.effects(id, ctx, land))
                 case _ => Try(throw new RuntimeException("Land not found"))
               }
             }
@@ -64,28 +64,31 @@ object Engine {
           case Cast(replyTo, player, id, args) => parseContext(replyTo, state, player, args) { ctx => checkPriority(ctx) { // Player Wrapper
             persistEvents(ctx) {
               state.getCardFromZone(id, Hand(player)).filterNot(_.card.isLand) match {
-                case Some(UnPlayed(card, _)) => card.checkCastingConditions(ctx).map { _ =>
-                  // TODO: There can be alternative costs also
-                  card.cost.pay(id, player) ++ List(Stacked(id, player, args), PriorityPassed(state.nextPriority))
-                }
+                case Some(card) =>
+                  card.checkConditions(ctx)
+                    .flatMap(_ => card.payCost(id, ctx))
+                    .map(costEvents => costEvents ++ List(Stacked(id, player, args), PriorityPassed(state.nextPriority)))
                 case None => Try(throw new RuntimeException("Card not found"))
               }
             }
           }}
 
-          // TODO: Only non-Mana Abilities go on the Stack
-          case Activate(replyTo, player, id, abilityId) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { // Player Wrapper
-            state.battleField.filter(_._2.owner == player).get(id) match {
-              case Some(permanent) =>
-                permanent.card.activatedAbilities.get(abilityId) match {
+          case Activate(replyTo, player, id, abilityId, args) => parseContext(replyTo, state, player, args) { ctx => checkPriority(ctx) {
+            persistEvents(ctx) {
+              state.listCardsFromZone(Battlefield).filter(_._2.controller == player).get(id) match {
+                case Some(permanent) => permanent.card.activatedAbilities.get(abilityId) match {
                   case Some(ability) =>
-                    if ability.cost.canPay(permanent) then
-                      Effect.persist(triggersHandler(state, ability.cost.pay(id, player) ++ ability.effect(state, player))).thenReply(replyTo)(state => StatusReply.Success(state))
-                    else
-                      Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Cannot pay the cost"))
-                  case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Abilities not found"))
+                    ability.checkConditions(ctx)
+                      .flatMap(_ => ability.payCost(id, ctx, permanent))
+                      .map(costEvents => costEvents ++ (if ability.manaAbility then
+                        ability.effects(id, ctx, permanent)
+                      else
+                        List(StackedAbility(id, abilityId, player, ctx.args), PriorityPassed(state.nextPriority))
+                      ))
+                  case None => Try(throw new RuntimeException("Ability not found"))
                 }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
+                case None => Try(throw new RuntimeException("Card not found"))
+              }
             }
           }}
 
@@ -130,9 +133,9 @@ object Engine {
                 // TODO: Should stop/print a message when a spell need interaction
                 state.listCardsFromZone(Stack).toList.reverse match {
                   case Nil => throw new RuntimeException("Nothing to resolve. You can go to next phase")
-                  case (id, spell) :: tail => spell.effects(id, ctx) ++ (tail match {
+                  case (id, spell) :: tail => spell.buildEffects(id, ctx) ++ (tail match {
                     case Nil => List(PriorityPassed(state.activePlayer))
-                    case (_, nextSpell: Spell[_]) :: _ if nextSpell.controller != state.priority => List(PriorityPassed(state.nextPriority))
+                    case (_, nextSpell: Spell[_]) :: _ if nextSpell.controller == state.priority => List(PriorityPassed(state.nextPriority))
                     case _ => List()
                   })
                 }
@@ -217,6 +220,17 @@ object Engine {
               case Some(result) => result match {
                 case (_, UnPlayed(_: Land, _)) => state
                 case (zone, _) => state.moveCard(id, player, zone, Stack, args)
+              }
+            }
+          case StackedAbility(id, abilityId, player, args) =>
+            state.getCard(id) match {
+              case None => state
+              case Some(result) => result._2.card.activatedAbilities.get(abilityId) match {
+                case Some(ability) =>
+                  val abilityTokenId = s"$id$abilityId".toInt * 1000 // TODO: 1541000
+                  val abilityTokenName = s"${result._2.card.name} - Ability $abilityId"
+                  state.createToken(abilityTokenId, Stack, Spell(AbilityToken(abilityTokenName, ability), player, player, args))
+                case None => state
               }
             }
 

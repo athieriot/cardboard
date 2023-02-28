@@ -35,7 +35,7 @@ object CommandLine {
   
   private def parseArg(x: String): Option[Arg[_]] = {
     x.replaceAll("-", "").split("=").toList match {
-      case "target" :: y :: Nil => Some(TargetArg(y.toInt))
+      case "target" :: y :: Nil => Some(TargetArg(y))
       case _ => None
     }
   }
@@ -71,7 +71,7 @@ object CommandLine {
 
         case Ready(priority) =>
           val input = lineReader.readLine(s"|$priority|> ")
-          val inputs = input.toLowerCase.split(" ").toList
+          val inputs = input.split(" ").toList
 
           if inputs.head == "exit" then
             context.self ! Terminate
@@ -79,13 +79,14 @@ object CommandLine {
           else
             // TODO: "cmd+n" for next ?
             // TODO: Skip only in cli: automate phase/resolution if not exceptions
-            val actionOpt = inputs match {
+            val actionOpt = inputs.head.toLowerCase +: inputs.tail match {
               case "read" :: _ :: Nil => Some(Recover.apply)
-              case "play" :: id :: Nil => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, priority, readIdFromArg(id)))
+              case "play" :: id :: args => Some((ref: ActorRef[StatusReply[State]]) => PlayLand(ref, priority, readIdFromArg(id), args.flatMap(parseArg)))
               case "cast" :: id :: args => Some((ref: ActorRef[StatusReply[State]]) => Cast(ref, priority, readIdFromArg(id), args.flatMap(parseArg)))
               case "attack" :: id :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareAttacker(ref, priority, readIdFromArg(id)))
               case "block" :: id :: block :: Nil => Some((ref: ActorRef[StatusReply[State]]) => DeclareBlocker(ref, priority, readIdFromArg(id), readIdFromArg(block)))
-              case "activate" :: id :: abilityId :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(id), abilityId.toInt))
+              case "activate" :: id :: abilityId :: args => Some((ref: ActorRef[StatusReply[State]]) => Activate(ref, priority, readIdFromArg(id), abilityId.toInt, args.flatMap(parseArg)))
+              case "n" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority))
               case "next" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Next(ref, priority))
               case "resolve" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => Resolve(ref, priority))
               case "end" :: Nil => Some((ref: ActorRef[StatusReply[State]]) => EndTurn(ref, priority))

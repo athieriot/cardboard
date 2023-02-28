@@ -17,36 +17,39 @@ import scala.util.Try
   )
 )
 sealed abstract class Instant extends Card {
-  override def checkCastingConditions(ctx: Context): Try[Unit] = super.checkCastingConditions(ctx)
+  override def conditions(ctx: Context): Try[Unit] = Try {}
   
-  def effects(id: CardId, ctx: Context): List[Event] = List(PutIntoGraveyard(id, ctx.player))
+  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(PutIntoGraveyard(id, ctx.player))
 }
 
 class Counterspell(val set: MagicSet, val numberInSet: Int) extends Instant {
   val name: String = "Counterspell"
   val subTypes: List[String] = List("Instant")
   val color: Color = Color.blue
-  val cost: CastingCost = ManaCost("UU")
+  val cost: Cost = ManaCost("UU")
 
-  override def checkCastingConditions(ctx: Context): Try[Unit] = super.checkCastingConditions(ctx).flatMap { _ => Try {
+  override def conditions(ctx: Context): Try[Unit] = super.conditions(ctx).flatMap { _ => Try {
     // TODO: Extract in a "CounterCondition" ?
     ctx.args.find(_.isInstanceOf[TargetArg]) match {
+      case Some(TargetArg(target)) => target match {
+        case _: PlayerId => throw new RuntimeException("Target invalid, cannot be a player")
+        case cardId: CardId =>
+          ctx.state.getCardFromZone(cardId, Stack).filterNot(_.card.isToken).getOrElse(throw new RuntimeException("Target invalid, it has to be a card on the Stack"))
+      }
       case None => throw new RuntimeException("Please specify a target")
-      case Some(TargetArg(target)) =>
-        if ctx.state.getCardFromZone(target, Stack).isEmpty then
-          throw new RuntimeException("Target invalid, it has to be in the Stack")
     }
   }}
 
-  override def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = super.effects(id, ctx) ++ (
+  override def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = super.effects(id, ctx, cardState) ++ (
     cardState match {
-      case Spell(_, _, _, args) =>
-        args.find(_.isInstanceOf[TargetArg]) match {
-          case Some(TargetArg(target)) =>
-            // TODO: Don't forget to remove Abilities
-            ctx.state.getCardFromZone(target, Stack).map(_ => List(PutIntoGraveyard(target, ctx.player))).getOrElse(List())
-          case None => List()
+      case Spell(_, _, _, args) => args.find(_.isInstanceOf[TargetArg]) match {
+        case Some(TargetArg(target)) => target match {
+          case _: PlayerId => List()
+          case cardId: CardId =>
+            ctx.state.getCardFromZone(cardId, Stack).filterNot(_.card.isToken).map(_ => List(PutIntoGraveyard(cardId, ctx.player))).getOrElse(List())
         }
+        case None => List()
+      }
       case _ => List()
     }
   )

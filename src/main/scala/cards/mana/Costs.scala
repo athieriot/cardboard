@@ -4,33 +4,32 @@ import cards.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 
-trait AbilityCost {
-  // TODO: Feel like the id should be on the Ability instance
-  def canPay(card: Card|Permanent[PermanentCard]): Boolean
-  def pay(id: CardId, player: PlayerId): List[Event]
-}
-case object Tap extends AbilityCost {
-  // TODO: Also it could probably return a Try instead to return more precise messages
-  def canPay(card: Card|Permanent[PermanentCard]): Boolean = card match {
-    case permanent: Permanent[PermanentCard] => permanent.status == Status.Untapped && !permanent.hasSummoningSickness
-    case _ => false
-  }
-  def pay(id: CardId, player: PlayerId): List[Event] = List(Tapped(id))
-}
+import scala.annotation.unused
+import scala.util.Try
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
   Array(
     new JsonSubTypes.Type(value = classOf[ManaCost], name = "mana"),
+    new JsonSubTypes.Type(value = classOf[Tap], name = "tap"),
   )
 )
-trait CastingCost {
-  // TODO: Take context ?
-  def canPay(state: BoardState, player: PlayerId): Boolean
-  def pay(id: CardId, player: PlayerId): List[Event]
+// TODO: Also have Suspend as a Cost Type
+trait Cost {
+  def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]]
 }
-// TODO: Validate valid ManaCost text
-case class ManaCost(text: String) extends CastingCost {
-  def canPay(state: BoardState, player: PlayerId): Boolean = (state.players(player).manaPool - this).isSuccess
-  def pay(id: CardId, player: PlayerId): List[Event] = List(ManaPaid(this, player))
+class Tap extends Cost {
+  def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]] = Try { cardState match {
+    case permanent: Permanent[_] if permanent.card.isInstanceOf[PermanentCard] =>
+      if permanent.status == Status.Tapped  then
+        throw new RuntimeException("Permanent is already Tapped")
+      else if permanent.hasSummoningSickness then
+        throw new RuntimeException("Creature has summoning sickness")
+      else List(Tapped(id))
+    case _ => throw new RuntimeException("Target is not a Permanent")
+  }}
+}
+// TODO: Validate valid ManaCost text ?
+case class ManaCost(text: String) extends Cost {
+  def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]] = (ctx.state.players(ctx.player).manaPool - this).map(_ => List(ManaPaid(this, ctx.player)))
 }

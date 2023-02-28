@@ -14,6 +14,7 @@ import monocle.syntax.all.*
 
 import java.time.Instant
 import scala.annotation.targetName
+import scala.collection.immutable.ListMap
 
 type CardId = Int
 type PlayerId = String
@@ -34,6 +35,7 @@ case class PlayerState(
 }
 
 // TODO: Have a way to reassign order and amount of damages when more than one blocker
+// TODO: Mark creature as attacking/blocking in the battlefield zone
 case class CombatZoneEntry(
   attacker: Permanent[PermanentCard],
   target: TargetId,
@@ -71,7 +73,7 @@ case class BoardState(
   def focusOnZone[A <: CardState[Card]](zone: Zone[A]): AppliedOptional[BoardState, Map[CardId, A]] = zone.focusIn(this)
   def getCardFromZone[A <: CardState[Card]](id: CardId, zone: Zone[A]): Option[A] = zone.focusIn(this).getOption.flatMap(_.get(id))
   def listCardsFromZone[A <: CardState[Card]](zone: Zone[A]): Map[CardId, A] = zone.focusIn(this).getOption.get
-  def modifyAllCardsFromZone[A <: CardState[Card]](zone: Zone[A], block: A => A): BoardState = zone.focusIn(this).modify(_.view.mapValues(block).toMap)
+  def modifyAllCardsFromZone[A <: CardState[Card]](zone: Zone[A], block: A => A): BoardState = zone.focusIn(this).modify(m => ListMap(m.view.mapValues(block).toList: _*))
 
   // Card methods
   def modifyCardFromZone[A <: CardState[Card]](id: CardId, zone: Zone[A], block: A => A): BoardState = zone.focusIn(id, this).modify(block)
@@ -81,12 +83,15 @@ case class BoardState(
   def moveCards[A <: CardState[Card]](ids: List[CardId], by: PlayerId, origin: Zone[A], destination: Zone[A], args: List[Arg[_]] = List.empty): BoardState =
     ids.foldRight(this) { case (id, state) => state.moveCard(id, by, origin, destination) }
   def moveCard[A <: CardState[Card], B <: CardState[Card]](id: CardId, by: PlayerId, origin: Zone[A], destination: Zone[B], args: List[Arg[_]] = List.empty): BoardState = getCardFromZone(id, origin) match {
+    case Some(Spell(_: Token, _, _, _)) => focusOnZone(origin).modify(_.removed(id))
     case Some(card) =>
       focusOnZone(destination).modify(_ + (id -> destination.convert(by, card, args)))
-        .focus(_.cardsZone).modify(_.updated(id, destination.asInstanceOf[Zone[CardState[Card]]]))
+        .focus(_.cardsZone).modify(_.updatedWith(id)(_.map(_ => destination.asInstanceOf[Zone[CardState[Card]]])))
         .focusOnZone(origin).modify(_.removed(id))
     case None => this
   }
+  def createToken[A <: CardState[Card]](id: CardId, destination: Zone[A], tokenState: A): BoardState =
+    focusOnZone(destination).modify(_ + (id -> tokenState))
 
   // TODO: Will need to add more restrictions based on static abilities
   // Combat methods
