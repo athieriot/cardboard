@@ -8,7 +8,7 @@ import game.mechanics.*
 import monocle.syntax.all.*
 
 import java.net.URL
-import scala.util.Try
+import scala.util.{Success, Try}
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
@@ -42,7 +42,7 @@ class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val baseToughness: Option[Int] = Some(1)
 
   override def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(new Tap(), "Add one green mana", (_: CardId, ctx: Context, _: CardState[Card]) => List(ManaAdded(Map(Color.green -> 1), ctx.player)), manaAbility = true)
+    1 -> Ability(new Tap(), "Add one green mana", (_, ctx: Context, _) => List(ManaAdded(Map(Color.green -> 1), ctx.player)), manaAbility = true)
   )
 }
 
@@ -56,31 +56,27 @@ class ProdigalSorcerer(val set: MagicSet, val numberInSet: Int) extends Creature
 
   // TODO: Check for Target
   override def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(new Tap(), "Prodigal Sorcerer deals 1 damage to any target", (_: CardId, ctx: Context, cardState: CardState[Card]) =>
-      cardState match {
-        // TODO: Really need to extract Target Retrieval
-        case Spell(_, _, _, args) => args.find(_.isInstanceOf[TargetArg]) match {
-          case Some(TargetArg(target)) => target match {
-            case playerId: PlayerId =>
-              ctx.state.players.get(playerId).map(_ => List(DamageDealt(playerId, 1))).getOrElse(List())
-            case cardId: CardId =>
-              ctx.state.getCardFromZone(cardId, Battlefield).map(_ => List(DamageDealt(cardId, 1))).getOrElse(List())
+    1 -> Ability(new Tap(), "Prodigal Sorcerer deals 1 damage to any target",
+      effects = (_: CardId, ctx: Context, cardState: CardState[Card]) =>
+        cardState match {
+          case Spell(_, _, _, args) =>
+            Args.retrieveTarget(args) match {
+              case Success(playerId: PlayerId) => ctx.state.players.get(playerId).map(_ => List(DamageDealt(playerId, 1))).getOrElse(List())
+              case Success(cardId: CardId) => ctx.state.getCardFromZone(cardId, Battlefield).map(_ => List(DamageDealt(cardId, 1))).getOrElse(List())
+              case _ => List()
+            }
+          case _ => List()
+        },
+      conditions = (ctx: Context) => Try {
+        Args.retrieveTarget(ctx.args).flatMap(target => Try {
+          target match {
+            case playerId: PlayerId => ctx.state.players.getOrElse(playerId, throw new RuntimeException("Invalid Target player"))
+            case cardId: CardId => ctx.state.getCardFromZone(cardId, Battlefield).getOrElse(throw new RuntimeException("Target invalid, it has to be in the Battlefield"))
           }
-          case None => List()
-        }
-        case _ => List()
+        })
       }
-  , conditions = (ctx: Context) => Try {
-      ctx.args.find(_.isInstanceOf[TargetArg]) match {
-        case Some(TargetArg(target)) => target match {
-          case playerId: PlayerId =>
-            ctx.state.players.getOrElse(playerId, throw new RuntimeException("Invalid Target player"))
-          case cardId: CardId =>
-            ctx.state.getCardFromZone(cardId, Battlefield).getOrElse(throw new RuntimeException("Target invalid, it has to be in the Battlefield"))
-        }
-        case None => throw new RuntimeException("Please specify a target")
-      }
-    }))
+    )
+  )
 }
 
 class MonssGoblinRaiders(val set: MagicSet, val numberInSet: Int) extends Creature {

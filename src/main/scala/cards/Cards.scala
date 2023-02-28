@@ -30,6 +30,7 @@ abstract class Card {
 
   // TODO: That should probably be a list
   def conditions(ctx: Context): Try[Unit]
+  // TODO: Would love to have the type of CardState being the same as the current instance
   def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event]
 
   // TODO: Part of permanent ?

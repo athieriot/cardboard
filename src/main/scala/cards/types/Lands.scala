@@ -47,7 +47,7 @@ sealed abstract class BasicLand extends Land {
   def colorProduced: Color
   
   override def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(new Tap(), s"Add one ${colorProduced.toString} mana", (_: CardId, ctx: Context, _: CardState[Card]) => List(ManaAdded(Map(colorProduced -> 1), ctx.player)), manaAbility = true)
+    1 -> Ability(new Tap(), s"Add one ${colorProduced.toString} mana", (_, ctx: Context, _) => List(ManaAdded(Map(colorProduced -> 1), ctx.player)), manaAbility = true)
   )
 }
 

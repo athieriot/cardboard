@@ -35,7 +35,7 @@ object CommandLine {
   
   private def parseArg(x: String): Option[Arg[_]] = {
     x.replaceAll("-", "").split("=").toList match {
-      case "target" :: y :: Nil => Some(TargetArg(y))
+      case "target" :: y :: Nil => Some(TargetArg(y.toIntOption.getOrElse(y)))
       case _ => None
     }
   }
@@ -181,10 +181,11 @@ object CommandLine {
 
   private def renderPlayer(state: BoardState, name: String, playerState: PlayerState): Unit = {
     val active = if state.activePlayer == name then "⭐ " else ""
+    val coloredName = if state.priority == name then s"${Console.RED_B}$name${Console.RESET}" else name
     val priority = if state.priority == name then " 🟢" else ""
 
     println("|------------------")
-    println(s"| Player: $active$name$priority - Life: ${playerState.life}")
+    println(s"| Player: $active$coloredName$priority - Life: ${playerState.life}")
     println(s"| 📚 Library: ${playerState.library.size}")
     println(s"| 🪦  Graveyard (${playerState.graveyard.size}): ${playerState.graveyard.map(p => renderName(p._1, p._2.card)).mkString(", ")}")
     println(s"| 🪄  Mana: ${playerState.manaPool.pool.map(m => terminalColor(m._1, s"${m._1} (${m._2})")).mkString(" / ")}")

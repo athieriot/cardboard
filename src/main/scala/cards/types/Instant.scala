@@ -8,7 +8,7 @@ import game.mechanics.*
 import monocle.syntax.all.*
 
 import java.net.URL
-import scala.util.Try
+import scala.util.{Success, Try}
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
@@ -28,28 +28,22 @@ class Counterspell(val set: MagicSet, val numberInSet: Int) extends Instant {
   val color: Color = Color.blue
   val cost: Cost = ManaCost("UU")
 
-  override def conditions(ctx: Context): Try[Unit] = super.conditions(ctx).flatMap { _ => Try {
-    // TODO: Extract in a "CounterCondition" ?
-    ctx.args.find(_.isInstanceOf[TargetArg]) match {
-      case Some(TargetArg(target)) => target match {
-        case _: PlayerId => throw new RuntimeException("Target invalid, cannot be a player")
-        case cardId: CardId =>
-          ctx.state.getCardFromZone(cardId, Stack).filterNot(_.card.isToken).getOrElse(throw new RuntimeException("Target invalid, it has to be a card on the Stack"))
-      }
-      case None => throw new RuntimeException("Please specify a target")
-    }
-  }}
+  override def conditions(ctx: Context): Try[Unit] = super.conditions(ctx).flatMap { _ =>
+    Args.retrieveTarget(ctx.args).flatMap(target => Try { target match {
+      case _: PlayerId => throw new RuntimeException("Target invalid, cannot be a player")
+      case cardId: CardId =>
+        ctx.state.getCardFromZone(cardId, Stack).filterNot(_.card.isToken).getOrElse(throw new RuntimeException("Target invalid, it has to be a card on the Stack"))
+    }})
+  }
 
   override def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = super.effects(id, ctx, cardState) ++ (
     cardState match {
-      case Spell(_, _, _, args) => args.find(_.isInstanceOf[TargetArg]) match {
-        case Some(TargetArg(target)) => target match {
-          case _: PlayerId => List()
-          case cardId: CardId =>
+      case Spell(_, _, _, args) =>
+        Args.retrieveTarget(args) match {
+          case Success(cardId: CardId) =>
             ctx.state.getCardFromZone(cardId, Stack).filterNot(_.card.isToken).map(_ => List(PutIntoGraveyard(cardId, ctx.player))).getOrElse(List())
+          case _ => List()
         }
-        case None => List()
-      }
       case _ => List()
     }
   )

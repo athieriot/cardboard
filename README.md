@@ -8,8 +8,8 @@ sbt run
 
 # Next
 
-- Abilities on the Stack
-- Implement more of "persistEvents"
 - Refactor CombatZone
+- Implement more of "persistEvents"
+- Trample
 - Improve Priority handling by implementing "Pass"
 - Tests !
