@@ -39,6 +39,8 @@ case class Permanent[T <: PermanentCard](
   status: Status = Status.Untapped,
   firstTurn: Boolean = true,
   damages: Int = 0,
+  attacking: Option[TargetId] = None,
+  bolocking: Option[CardId] = None,
   args: List[Arg[_]] = List.empty
 ) extends CardState[T] {
   def hasSummoningSickness: Boolean = card.isCreature && !card.keywordAbilities.contains(KeywordAbilities.haste) && firstTurn

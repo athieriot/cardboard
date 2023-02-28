@@ -13,7 +13,7 @@ object Triggers {
     }._2
   }
 
-  // TODO: Try so we can throw errors and also map/flatMap ?
+  // TODO: Try[(State, List[Event])] so we can throw errors and also map/flatMap ?
   private def triggerHandler(state: State, event: Event): (State, List[Event]) =
     val newEvents = event match {
       case MovedToStep(step) =>
@@ -45,11 +45,11 @@ object Triggers {
       step match {
         case Step.unTap => List(Untapped)
         case Step.draw => List(Drawn(1, state.activePlayer))
-        case Step.declareBlockers => if state.combatZone.isEmpty then List(MovedToStep(Step.endOfCombat)) else List()
+        case Step.declareBlockers => if state.attackers.isEmpty then List(MovedToStep(Step.endOfCombat)) else List()
         case Step.combatDamage =>
           // TODO: This might require a bit of an explanation
-          state.combatZone.toList.flatMap { case (attackerId, CombatZoneEntry(attacker, target, blockers)) => blockers match {
-            case m if m.isEmpty => if attacker.power > 0 then List(DamageDealt(target, attacker.power)) else List()
+          state.attackers.toList.flatMap { case (attackerId, (attacker, blockers)) => blockers match {
+            case m if m.isEmpty => if attacker.power > 0 then List(DamageDealt(attacker.attacking.get, attacker.power)) else List()
             case _ =>
               val (events, _, _) = blockers.foldLeft((List.empty[Event], attacker.power, attacker.toughness)) { case (acc@(events, powerLeft, toughnessLeft), (blockerId, blocker)) =>
                 if toughnessLeft > 0 && powerLeft > 0 then

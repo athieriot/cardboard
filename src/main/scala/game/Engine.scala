@@ -18,7 +18,7 @@ import monocle.syntax.all.*
 import java.util.UUID
 import scala.collection.MapView
 import scala.collection.immutable.ListMap
-import scala.concurrent.Future
+import scala.concurrent.{Future, blocking}
 import scala.util.{Failure, Random, Success, Try}
 
 object Engine {
@@ -94,24 +94,27 @@ object Engine {
 
           // TODO: Have a round of priority after
           case DeclareAttacker(replyTo, player, id) => parseContext(replyTo, state, player) { ctx => checkPriority(ctx) { checkStep(ctx, Step.declareAttackers) {
-            state.potentialAttackers(player).get(id) match {
-              case Some(_) =>
-                Effect.persist(triggersHandler(state, List(Tapped(id), AttackerDeclared(id)))).thenReply(replyTo)(state => StatusReply.Success(state))
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
-            }
+            persistEvents(ctx) { Try {
+              state.potentialAttackers(player).get(id) match {
+                case Some(_) => List(Tapped(id), AttackerDeclared(id))
+                case None => throw new RuntimeException("Card not found")
+              }
+            }}
           }}}
 
           // TODO: Multiple blockers
           // TODO: Would not work for 4 Players
+          // TODO: Have a way to reassign order and amount of damages when more than one blocker
           case DeclareBlocker(replyTo, player, id, blocker) => parseContext(replyTo, state, player) { ctx => checkStep(ctx, Step.declareBlockers) {
-            state.potentialBlockers(state.nextPlayer).get(blocker) match {
-              case Some(_) =>
-                state.combatZone.get(id) match {
-                  case Some(_) => Effect.persist(triggersHandler(state, List(BlockerDeclared(id, blocker)))).thenReply(replyTo)(state => StatusReply.Success(state))
-                  case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Attacker not found"))
+            persistEvents(ctx) { Try {
+              state.potentialBlockers(state.nextPlayer).get(blocker) match {
+                case Some(_) => state.attackers.get(id) match {
+                  case Some(_) => List(BlockerDeclared(id, blocker))
+                  case None => throw new RuntimeException("Attacker not found")
                 }
-              case None => Effect.none.thenReply(replyTo)(_ => StatusReply.Error("Card not found"))
-            }
+                case None => throw new RuntimeException("Card not found")
+              }
+            }}
           }}
 
           // TODO: Apparently there is a round of priority after declare attacker/blockers
@@ -202,7 +205,7 @@ object Engine {
 
           case PriorityPassed(toPlayer) => state.focus(_.priority).replace(toPlayer)
 
-          case CombatEnded => state.focus(_.combatZone).replace(Map.empty)
+          case CombatEnded => state.modifyAllCardsFromZone(Battlefield, _.copy(attacking = None, bolocking = None))
 
           case TurnEnded =>
             state.modifyPlayers(_.copy(landsToPlay = 1))
@@ -213,7 +216,6 @@ object Engine {
           case ManaAdded(mana, player) => state.focusOnManaPool(player).modify(_ ++ mana)
           case ManaPaid(manaCost, player) => state.focusOnManaPool(player).modify(mp => (mp - manaCost).get)
 
-          // TODO: Ability
           case Stacked(id, player, args) =>
             state.getCard(id) match {
               case None => state
@@ -253,19 +255,14 @@ object Engine {
               }
             }
 
-          // TODO: Should move instances to the combat zone
           case AttackerDeclared(id) =>
-            state.battleField.get(id) match {
-              // TODO
-              case Some(permanent) => state.focus(_.combatZone).modify(_ + (id -> CombatZoneEntry(permanent, state.nextPlayer)))
-              case None => state
-            }
+            state.modifyCardFromZone(id, Battlefield, _.copy(attacking = Some(state.nextPlayer)))
 
-            // TODO: Naming !
           case BlockerDeclared(id, blocker) =>
-            // TODO
-            (state.combatZone.get(id), state.battleField.get(blocker)) match {
-              case (Some(_), Some(card)) => state.focus(_.combatZone.index(id).blockers).modify(_ + (blocker -> card))
+            val attackerOpt = state.attackers.get(id)
+            val blockerOpt = state.getCardFromZone(blocker, Battlefield)
+            (attackerOpt, blockerOpt) match {
+              case (Some(_), Some(_)) => state.modifyCardFromZone(blocker, Battlefield, _.copy(bolocking = Some(id)))
               case _ => state
             }
 

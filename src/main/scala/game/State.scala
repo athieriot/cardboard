@@ -34,14 +34,6 @@ case class PlayerState(
   def takeDamage(amount: Int): PlayerState = this.copy(life = life - amount)
 }
 
-// TODO: Have a way to reassign order and amount of damages when more than one blocker
-// TODO: Mark creature as attacking/blocking in the battlefield zone
-case class CombatZoneEntry(
-  attacker: Permanent[PermanentCard],
-  target: TargetId,
-  blockers: Map[CardId, Permanent[PermanentCard]] = Map.empty,
-)
-
 trait State
 case object EmptyState extends State
 case class EndState(loser: String) extends State
@@ -54,7 +46,6 @@ case class BoardState(
    // TODO: Stack should have it's own class with Pop/Put/Resolve
    stack: Map[CardId, Spell[Card]] = Map.empty,
    battleField: Map[CardId, Permanent[PermanentCard]] = Map.empty,
-   combatZone: Map[CardId, CombatZoneEntry] = Map.empty,
                      
    currentStep: Step = Step.preCombatMain,
    createdAt: Instant = Instant.now(),
@@ -95,6 +86,10 @@ case class BoardState(
 
   // TODO: Will need to add more restrictions based on static abilities
   // Combat methods
+  def attackers: Map[CardId, (Permanent[PermanentCard], Map[CardId, Permanent[PermanentCard]])] =
+    listCardsFromZone(Battlefield).filter(_._2.attacking.isDefined)
+      .map(kv => (kv._1, (kv._2, listCardsFromZone(Battlefield).filter(_._2.bolocking.contains(kv._1)))))
+    
   def potentialAttackers(player: PlayerId): Map[CardId, Permanent[PermanentCard]] = listCardsFromZone(Battlefield)
     .filter(_._2.controller == player)
     .filter(_._2.card.isCreature)
