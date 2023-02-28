@@ -60,7 +60,7 @@ object CommandLine {
           val playerTwo = lineReader.readLine("Player Two: ")
 
           val players = Map(
-            playerOne -> izzetDeck,
+            playerOne -> greenDeck,
             playerTwo -> blueDeck
           )
 
@@ -208,6 +208,8 @@ object CommandLine {
         println(s"|Subtype: ${card.card.subTypes.mkString(" - ")}")
         println(s"|Color: ${terminalColor(card.card.color, card.card.color.toString)}")
         println(s"|Cost: ${card.card.cost.toString}")
+        println(s"|Text: ${card.card.text}")
+        println(s"|Keywords: ${card.card.keywordAbilities.map(_.toString).mkString(", ")}")
         println(s"|Preview: ${card.card.preview}")
         print("|Abilities:\n")
         card.card.activatedAbilities.foreach { (i, ability) =>

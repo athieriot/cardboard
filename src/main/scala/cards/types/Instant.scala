@@ -28,6 +28,8 @@ class Counterspell(val set: MagicSet, val numberInSet: Int) extends Instant {
   val color: Color = Color.blue
   val cost: Cost = ManaCost("UU")
 
+  override def text: String = "Counter target spell"
+
   override def conditions(ctx: Context): Try[Unit] = super.conditions(ctx).flatMap { _ =>
     Args.retrieveTarget(ctx.args).flatMap(target => Try { target match {
       case _: PlayerId => throw new RuntimeException("Target invalid, cannot be a player")

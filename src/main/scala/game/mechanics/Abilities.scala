@@ -9,7 +9,7 @@ import java.net.URL
 import scala.util.Try
 
 enum KeywordAbilities {
-  case haste
+  case haste, trample
 }
 
 case class Ability(

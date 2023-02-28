@@ -13,12 +13,13 @@ enum MagicSet(val code: String) {
   case FourthEdition extends MagicSet("4ed")
 }
 
-val izzetDeck: Deck =
+val mountain = Mountain(FourthEdition, 373)
+val monssGoblinRaiders = MonssGoblinRaiders(FourthEdition, 213)
+val greenDeck: Deck =
   Deck(
-    (1 to 15).map(_ => Forest(FourthEdition, 376)).toList
-      ++ (1 to 15).map(_ => Mountain(FourthEdition, 373))
+    (1 to 30).map(_ => Forest(FourthEdition, 376)).toList
       ++ (1 to 15).map(_ => LlanowarElf(FourthEdition, 261))
-      ++ (1 to 15).map(_ => MonssGoblinRaiders(FourthEdition, 213))
+      ++ (1 to 15).map(_ => WarMammoth(FourthEdition, 286))
   )
 
 val blueDeck: Deck =

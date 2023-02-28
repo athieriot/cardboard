@@ -51,14 +51,13 @@ object Triggers {
           state.attackers.toList.flatMap { case (attackerId, (attacker, blockers)) => blockers match {
             case m if m.isEmpty => if attacker.power > 0 then List(DamageDealt(attacker.attacking.get, attacker.power)) else List()
             case _ =>
-              val (events, _, _) = blockers.foldLeft((List.empty[Event], attacker.power, attacker.toughness)) { case (acc@(events, powerLeft, toughnessLeft), (blockerId, blocker)) =>
+              val (events, powerLeft, toughnessLeft) = blockers.foldLeft((List.empty[Event], attacker.power, attacker.toughness)) { case (acc@(events, powerLeft, toughnessLeft), (blockerId, blocker)) =>
                 if toughnessLeft > 0 && powerLeft > 0 then
                   val damageAssigned = powerLeft.min(blocker.toughness)
                   (events ++ List(DamageDealt(attackerId, blocker.power), DamageDealt(blockerId, damageAssigned)), powerLeft - damageAssigned, toughnessLeft - blocker.power)
                 else acc
               }
-              events
-            // TODO: Trample => ++ (if powerLeft > 0 then List(DamageDealt(target, powerLeft)) else List())
+              events ++ (if toughnessLeft > 0 && powerLeft > 0 then List(DamageDealt(attacker.attacking.get, powerLeft)) else List())
           }}
         case Step.endOfCombat => List(CombatEnded)
         case _ => List()

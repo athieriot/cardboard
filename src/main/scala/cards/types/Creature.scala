@@ -33,6 +33,7 @@ sealed abstract class Creature extends PermanentCard {
   def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(EnteredTheBattlefield(id))
 }
 
+// Green
 class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val name: String = "Llanowar Elf"
   val subTypes: List[String] = List("Creature", "Elf Druid")
@@ -46,6 +47,18 @@ class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   )
 }
 
+class WarMammoth(val set: MagicSet, val numberInSet: Int) extends Creature {
+  val name: String = "War Mammoth"
+  val subTypes: List[String] = List("Creature", "Elephant")
+  val color: Color = Color.green
+  val cost: Cost = ManaCost("3G")
+  val basePower: Option[Int] = Some(3)
+  val baseToughness: Option[Int] = Some(3)
+
+  override def keywordAbilities: List[KeywordAbilities] = List(KeywordAbilities.trample)
+}
+
+// Blue
 class ProdigalSorcerer(val set: MagicSet, val numberInSet: Int) extends Creature {
   val name: String = "Prodigal Sorcerer"
   val subTypes: List[String] = List("Creature", "Human Wizard")
@@ -54,7 +67,6 @@ class ProdigalSorcerer(val set: MagicSet, val numberInSet: Int) extends Creature
   val basePower: Option[Int] = Some(1)
   val baseToughness: Option[Int] = Some(1)
 
-  // TODO: Check for Target
   override def activatedAbilities: Map[Int, Ability] = Map(
     1 -> Ability(new Tap(), "Prodigal Sorcerer deals 1 damage to any target",
       effects = (_: CardId, ctx: Context, cardState: CardState[Card]) =>
@@ -79,6 +91,7 @@ class ProdigalSorcerer(val set: MagicSet, val numberInSet: Int) extends Creature
   )
 }
 
+// Red
 class MonssGoblinRaiders(val set: MagicSet, val numberInSet: Int) extends Creature {
   val name: String = "Mons's Goblin Raiders"
   val subTypes: List[String] = List("Creature", "Goblin")

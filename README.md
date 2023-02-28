@@ -8,8 +8,5 @@ sbt run
 
 # Next
 
-- Refactor CombatZone
-- Implement more of "persistEvents"
-- Trample
 - Improve Priority handling by implementing "Pass"
 - Tests !

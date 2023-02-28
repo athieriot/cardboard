@@ -33,6 +33,7 @@ abstract class Card {
   // TODO: Would love to have the type of CardState being the same as the current instance
   def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event]
 
+  def text: String = ""
   // TODO: Part of permanent ?
   // TODO: Maybe all those should be on the CardState classes
   def keywordAbilities: List[KeywordAbilities] = List.empty
