@@ -5,11 +5,11 @@ import akka.dispatch.Futures
 import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EffectBuilder, EventSourcedBehavior, ReplyEffect}
-import cards.*
-import cards.mana.*
-import cards.types.*
 import com.typesafe.scalalogging.LazyLogging
 import game.*
+import game.cards.*
+import game.cards.types.*
+import game.mana.ManaPool
 import game.mechanics.*
 import game.mechanics.Triggers.triggersHandler
 import monocle.AppliedOptional
@@ -232,7 +232,7 @@ object Engine {
                 case Some(ability) =>
                   val abilityTokenId = s"$id$abilityId".toInt * 1000 // TODO: 1541000
                   val abilityTokenName = s"${result._2.card.name} - Ability $abilityId"
-                  state.createToken(abilityTokenId, Stack, Spell(AbilityToken(abilityTokenName, ability), player, player, args))
+                  state.createToken(abilityTokenId, Stack, cards.Spell(AbilityToken(abilityTokenName, ability), player, player, args))
                 case None => state
               }
             }

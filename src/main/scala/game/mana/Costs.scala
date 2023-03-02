@@ -1,8 +1,9 @@
-package cards.mana
+package game.mana
 
-import cards.*
+import game.cards.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
+import game.cards.{Card, CardState, Permanent, PermanentCard}
 
 import scala.annotation.unused
 import scala.util.Try
@@ -21,6 +22,7 @@ trait Cost {
 }
 class NoCost extends ManaCost("0")
 class Tap extends Cost {
+  override def toString: String = "Tap"
   def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]] = Try { cardState match {
     case permanent: Permanent[_] if permanent.card.isInstanceOf[PermanentCard] =>
       if permanent.status == Status.Tapped  then
@@ -33,5 +35,6 @@ class Tap extends Cost {
 }
 // TODO: Validate valid ManaCost text ?
 case class ManaCost(text: String) extends Cost {
+  override def toString: String = text
   def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]] = (ctx.state.players(ctx.player).manaPool - this).map(_ => List(ManaPaid(this, ctx.player)))
 }

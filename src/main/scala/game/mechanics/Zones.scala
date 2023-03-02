@@ -1,8 +1,10 @@
 package game.mechanics
 
-import cards.{Card, *}
-import cards.types.*
+import game.cards.*
+import game.cards.types.*
 import game.*
+import game.cards.types.Land
+import game.cards.{Card, CardState, Permanent, PermanentCard, Spell, UnPlayed}
 import monocle.AppliedOptional
 import monocle.syntax.all.*
 

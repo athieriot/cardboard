@@ -3,7 +3,6 @@ package game
 import akka.actor.typed.ActorRef
 import akka.pattern.StatusReply
 import akka.persistence.typed.scaladsl.{Effect, ReplyEffect}
-import cards.types.{LlanowarElf, MonssGoblinRaiders, ProdigalSorcerer}
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.mechanics.Step
 import game.mechanics.Triggers.triggersHandler

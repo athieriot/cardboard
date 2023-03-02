@@ -1,10 +1,9 @@
-package cards
+package game.cards
 
-import cards.mana.*
-import cards.types.*
+import game.cards.types.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
-import game.mechanics.{AbilityToken, *}
+import game.mechanics.*
 
 import java.net.URL
 import scala.util.Try

@@ -5,8 +5,8 @@ import akka.actor.testkit.typed.scaladsl.{LogCapturing, ScalaTestWithActorTestKi
 import akka.pattern.StatusReply
 import akka.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import akka.persistence.typed.PersistenceId
-import cards.Deck
-import cards.types.{forest, llanowarElf}
+import game.cards.Deck
+import game.cards.types.*
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpecLike

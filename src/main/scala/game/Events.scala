@@ -2,10 +2,10 @@ package game
 
 import akka.actor.typed.ActorRef
 import akka.pattern.StatusReply
-import cards.*
 import game.*
-import cards.mana.*
-import game.mechanics.Step
+import game.cards.*
+import game.mana.*
+import game.mechanics.*
 
 /**
  * EventSourcing Behavior Commands

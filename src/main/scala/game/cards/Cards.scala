@@ -1,11 +1,13 @@
-package cards
+package game.cards
 
-import cards.mana.*
-import cards.types.*
+import game.cards.types.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 import monocle.syntax.all.*
-import cards.types.*
+import game.cards.types.*
+import collection.common.BasicLand
+import collection.sets.FourthEdition
+import game.mana.{Color, Cost}
 import game.mechanics.*
 
 import java.net.URL
@@ -14,11 +16,9 @@ import scala.util.Try
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
   Array(
-    new JsonSubTypes.Type(value = classOf[Land], name = "land"),
-    new JsonSubTypes.Type(value = classOf[Creature], name = "creature"),
-    new JsonSubTypes.Type(value = classOf[Instant], name = "instant"),
     new JsonSubTypes.Type(value = classOf[Token], name = "token"),
-    new JsonSubTypes.Type(value = classOf[Artifact], name = "artifact"),
+    
+    new JsonSubTypes.Type(value = classOf[FourthEdition], name = "4ed"),
   )
 )
 abstract class Card {
@@ -38,6 +38,7 @@ abstract class Card {
   // TODO: Part of permanent ?
   // TODO: Maybe all those should be on the CardState classes
   def keywordAbilities: List[KeywordAbilities] = List.empty
+  // TODO: Maybe this should be only one Map ?
   def activatedAbilities: Map[Int, ActivatedAbility] = Map.empty
   // TODO: I don't really like having functions to end up serialized
   def triggeredAbilities: Map[Int, TriggeredAbility] = Map.empty

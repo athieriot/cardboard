@@ -1,7 +1,7 @@
-package cards.mana
+package game.mana
 
-import cards.*
-import cards.types.*
+import game.cards.*
+import game.cards.types.*
 import monocle.syntax.all.*
 
 import scala.annotation.targetName
@@ -9,7 +9,7 @@ import scala.util.{Failure, Success, Try}
 
 // TODO: Phyrexian Mana !
 enum Color {
-  case red, green, black, white, blue, none
+  case red, green, black, white, blue, colorless
 }
 object Color {
   def colorFrom(c: Char): Option[Color] = c match {
@@ -18,7 +18,7 @@ object Color {
     case 'W' => Some(Color.white)
     case 'R' => Some(Color.red)
     case 'U' => Some(Color.blue)
-    case 'L' => Some(Color.none)
+    case 'L' => Some(Color.colorless)
     case _ => None
   }
 }

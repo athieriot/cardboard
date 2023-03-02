@@ -1,9 +1,10 @@
 package game.mechanics
 
-import cards.*
-import cards.mana.*
-import cards.types.*
+import game.cards.*
+import game.cards.types.*
 import game.*
+import game.cards.{Card, CardState, MagicSet, Token}
+import game.mana.{Color, Cost, NoCost}
 
 import java.net.URL
 import scala.util.Try
@@ -40,7 +41,7 @@ case class ActivatedAbility(
 }
 
 case class AbilityToken(name: String, ability: Ability) extends Token {
-  def color: Color = Color.none
+  def color: Color = Color.colorless
 
   override def subTypes: List[String] = throw new RuntimeException("Ability, not a Card")
   override def set: MagicSet = throw new RuntimeException("Ability, not a Card")

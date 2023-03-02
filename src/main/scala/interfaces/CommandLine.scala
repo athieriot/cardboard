@@ -4,10 +4,11 @@ import akka.actor.typed.{ActorRef, Behavior, RecipientRef}
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.pattern.StatusReply
 import akka.util.Timeout
-import cards.*
-import cards.mana.*
-import cards.types.*
+import game.cards.*
+import game.cards.types.*
 import game.*
+import game.cards.{Card, CardState, Permanent, PermanentCard}
+import game.mana.Color
 import game.mechanics.*
 import interfaces.CommandLine.renderName
 import org.jline.builtins.Completers.TreeCompleter.node
@@ -235,6 +236,6 @@ object CommandLine {
     case Color.white => s"${Console.WHITE}${Console.BLACK_B}$text${Console.RESET}"
     case Color.black => s"${Console.BLACK}${Console.WHITE_B}$text${Console.RESET}"
     case Color.blue => s"${Console.BLUE}$text${Console.RESET}"
-    case Color.none => s"${Console.YELLOW}$text${Console.RESET}"
+    case Color.colorless => s"${Console.YELLOW}$text${Console.RESET}"
   }
 }

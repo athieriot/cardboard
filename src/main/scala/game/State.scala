@@ -1,9 +1,8 @@
 package game
 
-import cards.{Card, CardState, PermanentCard, *}
-import cards.mana.ManaPool
-import cards.types.*
 import game.*
+import game.cards.*
+import game.mana.*
 import game.mechanics.*
 import monocle.{AppliedLens, AppliedOptional, Lens}
 
