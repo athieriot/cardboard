@@ -9,4 +9,5 @@ sbt run
 # Next
 
 - Improve Priority handling by implementing "Pass"
+- Implement Fog
 - Tests !

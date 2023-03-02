@@ -18,6 +18,7 @@ import scala.util.Try
     new JsonSubTypes.Type(value = classOf[Creature], name = "creature"),
     new JsonSubTypes.Type(value = classOf[Instant], name = "instant"),
     new JsonSubTypes.Type(value = classOf[Token], name = "token"),
+    new JsonSubTypes.Type(value = classOf[Artifact], name = "artifact"),
   )
 )
 abstract class Card {
@@ -37,11 +38,14 @@ abstract class Card {
   // TODO: Part of permanent ?
   // TODO: Maybe all those should be on the CardState classes
   def keywordAbilities: List[KeywordAbilities] = List.empty
-  def activatedAbilities: Map[Int, Ability] = Map.empty
+  def activatedAbilities: Map[Int, ActivatedAbility] = Map.empty
+  // TODO: I don't really like having functions to end up serialized
+  def triggeredAbilities: Map[Int, TriggeredAbility] = Map.empty
 
   def isLand: Boolean     = isInstanceOf[Land] || subTypes.exists(_.contains("Land"))
   def isCreature: Boolean = isInstanceOf[Creature] || subTypes.exists(_.contains("Creature"))
   def isToken: Boolean = isInstanceOf[Token] || subTypes.exists(_.contains("Token"))
+  def isArtifact: Boolean = isInstanceOf[Artifact] || subTypes.exists(_.contains("Artifact"))
 
   def preview: URL = {
     new URL(s"https://scryfall.com/card/${set.code}/$numberInSet/${name.replace(" ", "-").replace("'", "").toLowerCase}")

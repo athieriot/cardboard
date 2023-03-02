@@ -24,7 +24,8 @@ val greenDeck: Deck =
 
 val blueDeck: Deck =
   Deck(
-    (1 to 30).map(_ => Island(FourthEdition, 367)).toList
-      ++ (1 to 15).map(_ => Counterspell(FourthEdition, 65))
-      ++ (1 to 15).map(_ => ProdigalSorcerer(FourthEdition, 94))
+    (1 to 24).map(_ => Island(FourthEdition, 367)).toList
+      ++ (1 to 12).map(_ => AnkhOfMishra(FourthEdition, 294))
+      ++ (1 to 12).map(_ => Counterspell(FourthEdition, 65))
+      ++ (1 to 12).map(_ => ProdigalSorcerer(FourthEdition, 94))
   )

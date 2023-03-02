@@ -70,6 +70,7 @@ case class BoardState(
   def modifyCardFromZone[A <: CardState[Card]](id: CardId, zone: Zone[A], block: A => A): BoardState = zone.focusIn(id, this).modify(block)
   def getCard(id: CardId): Option[(Zone[CardState[Card]], CardState[Card])] = cardsZone.get(id).flatMap(zone => getCardFromZone(id, zone).map((zone, _)))
   def getCardOwner(id: CardId): Option[String] = getCard(id).map(_._2.owner)
+  def getCardController(id: CardId): Option[String] = getCard(id).map(_._2.controller)
   // TODO: Top or Bottom ?
   def moveCards[A <: CardState[Card]](ids: List[CardId], by: PlayerId, origin: Zone[A], destination: Zone[A], args: List[Arg[_]] = List.empty): BoardState =
     ids.foldRight(this) { case (id, state) => state.moveCard(id, by, origin, destination) }

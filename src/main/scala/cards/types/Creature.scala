@@ -16,6 +16,7 @@ import scala.util.{Success, Try}
     new JsonSubTypes.Type(value = classOf[LlanowarElf], name = "llanowarElf"),
     new JsonSubTypes.Type(value = classOf[ProdigalSorcerer], name = "prodigalSorcerer"),
     new JsonSubTypes.Type(value = classOf[MonssGoblinRaiders], name = "monssGoblinRaiders"),
+    new JsonSubTypes.Type(value = classOf[WarMammoth], name = "warMammoth"),
   )
 )
 sealed abstract class Creature extends PermanentCard {
@@ -42,8 +43,8 @@ class LlanowarElf(val set: MagicSet, val numberInSet: Int) extends Creature {
   val basePower: Option[Int] = Some(1)
   val baseToughness: Option[Int] = Some(1)
 
-  override def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(new Tap(), "Add one green mana", (_, ctx: Context, _) => List(ManaAdded(Map(Color.green -> 1), ctx.player)), manaAbility = true)
+  override def activatedAbilities: Map[Int, ActivatedAbility] = Map(
+    1 -> ActivatedAbility(new Tap(), "Add one green mana", (_, ctx: Context, _) => List(ManaAdded(Map(Color.green -> 1), ctx.player)), manaAbility = true)
   )
 }
 
@@ -67,8 +68,8 @@ class ProdigalSorcerer(val set: MagicSet, val numberInSet: Int) extends Creature
   val basePower: Option[Int] = Some(1)
   val baseToughness: Option[Int] = Some(1)
 
-  override def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(new Tap(), "Prodigal Sorcerer deals 1 damage to any target",
+  override def activatedAbilities: Map[Int, ActivatedAbility] = Map(
+    1 -> ActivatedAbility(new Tap(), "Prodigal Sorcerer deals 1 damage to any target",
       effects = (_: CardId, ctx: Context, cardState: CardState[Card]) =>
         cardState match {
           case Spell(_, _, _, args) =>

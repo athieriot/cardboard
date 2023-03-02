@@ -10,6 +10,7 @@ import scala.util.Try
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
   Array(
+    new JsonSubTypes.Type(value = classOf[NoCost], name = "noCost"),
     new JsonSubTypes.Type(value = classOf[ManaCost], name = "mana"),
     new JsonSubTypes.Type(value = classOf[Tap], name = "tap"),
   )
@@ -18,6 +19,7 @@ import scala.util.Try
 trait Cost {
   def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]]
 }
+class NoCost extends ManaCost("0")
 class Tap extends Cost {
   def pay(id: CardId, ctx: Context, cardState: CardState[Card]): Try[List[Event]] = Try { cardState match {
     case permanent: Permanent[_] if permanent.card.isInstanceOf[PermanentCard] =>

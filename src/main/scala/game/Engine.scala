@@ -179,7 +179,7 @@ object Engine {
           case GameCreated(die: Int, players: Map[String, Deck]) =>
             val startingUser = players.keys.toIndexedSeq(die)
             val decksWithIndex = players.zipWithIndex.toMap.map { case ((name, deck), playerIndex) =>
-              (name, deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex*100), UnPlayed(p._1, name))).toMap)
+              (name, deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex*100), UnPlayed(p._1, name, name))).toMap)
             }
 
             BoardState(
@@ -220,14 +220,15 @@ object Engine {
             state.getCard(id) match {
               case None => state
               case Some(result) => result match {
-                case (_, UnPlayed(_: Land, _)) => state
+                case (_, UnPlayed(_: Land, _, _)) => state
                 case (zone, _) => state.moveCard(id, player, zone, Stack, args)
               }
             }
           case StackedAbility(id, abilityId, player, args) =>
             state.getCard(id) match {
               case None => state
-              case Some(result) => result._2.card.activatedAbilities.get(abilityId) match {
+              // TODO: MOCHE !
+              case Some(result) => result._2.card.activatedAbilities.concat(result._2.card.triggeredAbilities).get(abilityId) match {
                 case Some(ability) =>
                   val abilityTokenId = s"$id$abilityId".toInt * 1000 // TODO: 1541000
                   val abilityTokenName = s"${result._2.card.name} - Ability $abilityId"
@@ -240,7 +241,7 @@ object Engine {
             state.getCard(id) match {
               case None => state
               case Some(result) => result match {
-                case (_, UnPlayed(_: Land, _)) =>
+                case (_, UnPlayed(_: Land, _, _)) =>
                   state.modifyPlayer(player, p => p.copy(landsToPlay = p.landsToPlay - 1))
                 case (_, _) => state
               }

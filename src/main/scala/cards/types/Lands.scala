@@ -46,15 +46,15 @@ sealed abstract class BasicLand extends Land {
   
   def colorProduced: Color
   
-  override def activatedAbilities: Map[Int, Ability] = Map(
-    1 -> Ability(new Tap(), s"Add one ${colorProduced.toString} mana", (_, ctx: Context, _) => List(ManaAdded(Map(colorProduced -> 1), ctx.player)), manaAbility = true)
+  override def activatedAbilities: Map[Int, ActivatedAbility] = Map(
+    1 -> ActivatedAbility(new Tap(), s"Add one ${colorProduced.toString} mana", (_, ctx: Context, _) => List(ManaAdded(Map(colorProduced -> 1), ctx.player)), manaAbility = true)
   )
 }
 
 class Forest(val set: MagicSet, val numberInSet: Int) extends BasicLand {
   val name: String = "Forest"
   val subTypes: List[String] = List("Basic Land", "Forest")
-  val cost: Cost = ManaCost("0")
+  val cost: Cost = new NoCost
   val colorProduced: Color = Color.green
   val basePower: Option[Int] = None
   val baseToughness: Option[Int] = None
@@ -63,7 +63,7 @@ class Forest(val set: MagicSet, val numberInSet: Int) extends BasicLand {
 class Island(val set: MagicSet, val numberInSet: Int) extends BasicLand {
   val name: String = "Island"
   val subTypes: List[String] = List("Basic Land", "Island")
-  val cost: Cost = ManaCost("0")
+  val cost: Cost = new NoCost
   val colorProduced: Color = Color.blue
   val basePower: Option[Int] = None
   val baseToughness: Option[Int] = None
@@ -72,7 +72,7 @@ class Island(val set: MagicSet, val numberInSet: Int) extends BasicLand {
 class Mountain(val set: MagicSet, val numberInSet: Int) extends BasicLand {
   val name: String = "Mountain"
   val subTypes: List[String] = List("Basic Land", "Mountain")
-  val cost: Cost = ManaCost("0")
+  val cost: Cost = new NoCost
   val colorProduced: Color = Color.red
   val basePower: Option[Int] = None
   val baseToughness: Option[Int] = None

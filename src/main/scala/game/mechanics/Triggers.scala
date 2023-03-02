@@ -20,7 +20,10 @@ object Triggers {
         val newState = eventHandler(state, event)
         event +: triggersHandler(newState, turnBaseActions(step, newState))
       case PriorityPassed(_) => triggersHandler(state, stateBasedActionsLoop(state)) :+ event
-      case _ => List(event)
+      // TODO: This actually won't make MovedToStep and PriorityPassed go through TriggeredAbilities
+      case event =>
+        val newState = eventHandler(state, event)
+        event +: triggersHandler(newState, triggeredAbilitiesLoop(newState, event))
     }
     (newEvents.foldLeft(state)(eventHandler(_, _)), newEvents)
 
@@ -30,11 +33,21 @@ object Triggers {
       case events => events ++ stateBasedActionsLoop(events.foldLeft(state)(eventHandler(_, _)), check)
     }
 
-  // TODO: I'm still quite scared that the state is not up to date at that point
   private def stateBaseActionsCheck(state: State): List[Event] = state match {
     case state: BoardState =>
       state.players.filter(_._2.life <= 0).map(p => GameEnded(p._1)).toList
         ++ state.battleField.filter(c => c._2.card.basePower.isDefined && c._2.toughness <= 0).map(c => Destroyed(c._1, c._2.owner)).toList
+    case _ => List.empty
+  }
+
+  private def triggeredAbilitiesLoop(state: State, event: Event): List[Event] = state match {
+    case state: BoardState =>
+      state.listCardsFromZone(Battlefield)
+        .filterNot(_._2.card.triggeredAbilities.isEmpty)
+        .flatMap(card => card._2.dispatchTriggers(event)
+          .map(ability => StackedAbility(card._1, ability._1, card._2.controller, List(ability._2)))
+        )
+        .toList
     case _ => List.empty
   }
 
