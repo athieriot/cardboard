@@ -112,7 +112,7 @@ abstract class TestSuiteWithActorTestKit(testKit: ActorTestKit) extends TestSuit
    */
   def serializationTestKit: SerializationTestKit = testKit.serializationTestKit
 
-  override def utestAfterEach(path: Seq[String]): Unit =
-    super.utestAfterEach(path)
+  override def utestAfterAll(): Unit =
+    super.utestAfterAll()
     testKit.shutdownTestKit()
 }

@@ -33,7 +33,7 @@ case class PlayerState(
   def takeDamage(amount: Int): PlayerState = this.copy(life = life - amount)
 }
 
-trait State
+sealed trait State
 case object EmptyState extends State
 case class EndState(loser: String) extends State
 case class BoardState(

@@ -26,6 +26,8 @@ object Engine {
   private val OPENING_HAND = 7
   private val MAX_HAND_SIZE = 7
 
+  def randomOrder(n: Int) = Random.shuffle(1 to n * 2).toList
+
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     state match {
       case EndState(_) => Effect.noReply
@@ -36,8 +38,6 @@ object Engine {
             if players.exists(!_._2.isValid) then
               Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Deck invalid"))
             else
-              def randomOrder(n: Int) = Random.shuffle(1 to n * 2).toList
-
               Effect.persist(
                 List(GameCreated(Random.nextInt(players.size), players))
                   ++ players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }
@@ -179,7 +179,7 @@ object Engine {
           case GameCreated(die: Int, players: Map[String, Deck]) =>
             val startingUser = players.keys.toIndexedSeq(die)
             val decksWithIndex = players.zipWithIndex.toMap.map { case ((name, deck), playerIndex) =>
-              (name, deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex*100), UnPlayed(p._1, name, name))).toMap)
+              (name, ListMap(deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex*100), UnPlayed(p._1, name, name))).sortBy(_._1):_*))
             }
 
             BoardState(
