@@ -1,7 +1,6 @@
 package collection.common
 
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
-import game.cards.MagicSet
 import game.cards.types.Land
 import game.{Context, ManaAdded}
 import game.mana.{Color, Cost, NoCost, Tap}

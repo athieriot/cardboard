@@ -4,8 +4,8 @@ import game.cards.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.mechanics.*
 import game.*
-import game.cards.{Card, CardState, MagicSet, PermanentCard, Spell}
-import game.mana.{Color, Cost, ManaCost}
+import game.cards.*
+import game.mana.*
 
 import scala.util.{Success, Try}
 

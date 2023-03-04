@@ -24,5 +24,5 @@ import game.cards.*
   )
 )
 trait FourthEdition extends Card {
-  override val set: MagicSet = MagicSet.FourthEdition
+  override val set: String = "4ed"
 }

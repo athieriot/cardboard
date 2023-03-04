@@ -1,6 +1,5 @@
 package game.cards
 
-import MagicSet.*
 import game.cards.types.*
 import game.cards
 
@@ -8,10 +7,6 @@ case class Deck(cards: List[Card], sideBoard: List[Card] = List.empty) {
   private val MIN_DECK_SIZE = 60
 
   def isValid: Boolean = cards.length >= MIN_DECK_SIZE
-}
-
-enum MagicSet(val code: String) {
-  case FourthEdition extends MagicSet("4ed")
 }
 
 val mountain = collection.fourthEdition.Mountain()

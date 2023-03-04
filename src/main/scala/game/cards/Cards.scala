@@ -6,7 +6,7 @@ import game.*
 import monocle.syntax.all.*
 import game.cards.types.*
 import collection.common.BasicLand
-import collection.sets.FourthEdition
+import collection.sets.{FourthEdition, PortalThreeKingdoms}
 import game.mana.{Color, Cost}
 import game.mechanics.*
 
@@ -19,6 +19,7 @@ import scala.util.Try
     new JsonSubTypes.Type(value = classOf[Token], name = "token"),
     
     new JsonSubTypes.Type(value = classOf[FourthEdition], name = "4ed"),
+    new JsonSubTypes.Type(value = classOf[PortalThreeKingdoms], name = "ptk"),
   )
 )
 abstract class Card {
@@ -26,7 +27,7 @@ abstract class Card {
   def subTypes: List[String]
   def color: Color
   def cost: Cost
-  def set: MagicSet
+  def set: String
   def numberInSet: Int
 
   // TODO: That should probably be a list
@@ -49,7 +50,7 @@ abstract class Card {
   def isArtifact: Boolean = isInstanceOf[Artifact] || subTypes.exists(_.contains("Artifact"))
 
   def preview: URL = {
-    new URL(s"https://scryfall.com/card/${set.code}/$numberInSet/${name.replace(" ", "-").replace("'", "").toLowerCase}")
+    new URL(s"https://scryfall.com/card/${set}/$numberInSet/${name.replace(" ", "-").replace("'", "").toLowerCase}")
   }
 }
 

@@ -4,7 +4,7 @@ import game.cards.*
 import game.mana.*
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
-import game.cards.{Card, CardState, MagicSet, PermanentCard}
+import game.cards.*
 import game.mechanics.*
 import monocle.syntax.all.*
 
