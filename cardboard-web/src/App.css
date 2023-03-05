@@ -1,0 +1,62 @@
+.container {  display: grid;
+  grid-template-columns: 0.3fr 1.7fr;
+  grid-template-rows: 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr 0.3fr;
+  grid-auto-flow: row;
+  grid-template-areas:
+    "Player-2 Hands-2"
+    "Library-2 Lands-2"
+    "Preview Permanents-2"
+    "Preview Stack---Attack"
+    "Preview Permanents-1"
+    "Library-1 Lands-1"
+    "Player-1 Hand-1"
+    "Turn Phases";
+}
+
+.Turn { grid-area: Turn; }
+
+.Phases { grid-area: Phases; }
+
+.Hand-1 { grid-area: Hand-1; }
+
+.Player-1 { grid-area: Player-1; }
+
+.Lands-1 { grid-area: Lands-1; }
+
+.Permanents-1 { grid-area: Permanents-1; }
+
+.Stack---Attack { grid-area: Stack---Attack; }
+
+.Permanents-2 { grid-area: Permanents-2; }
+
+.Lands-2 { grid-area: Lands-2; }
+
+.Hands-2 { grid-area: Hands-2; }
+
+.Player-2 { grid-area: Player-2; }
+
+.Library-2 { grid-area: Library-2; }
+
+.Library-1 { grid-area: Library-1; }
+
+.Preview { grid-area: Preview; }
+
+
+/* For presentation only, no need to copy the code below */
+.container .zone {
+  border: 2px solid;
+  position: relative;
+  border-image: url('https://cdn.dribbble.com/users/417348/screenshots/2839244/attachments/583820/wood-texture-hd.jpg') 10;
+  background-image: url('https://www.designbolts.com/wp-content/uploads/2021/01/white-wood-bck-1.jpg');
+}
+
+.container *:after {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  align-items: center;
+  justify-content: center;
+}

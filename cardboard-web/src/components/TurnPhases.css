@@ -1,0 +1,4 @@
+.turn_phase_content {
+    display: flex;
+    justify-content: space-evenly;
+}
