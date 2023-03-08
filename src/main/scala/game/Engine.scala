@@ -15,6 +15,7 @@ import game.mechanics.Triggers.triggersHandler
 import monocle.AppliedOptional
 import monocle.syntax.all.*
 
+import java.time.Instant
 import java.util.UUID
 import scala.collection.MapView
 import scala.collection.immutable.ListMap
@@ -39,7 +40,7 @@ object Engine {
               Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Deck invalid"))
             else
               Effect.persist(
-                List(GameCreated(Random.nextInt(players.size), players))
+                List(GameCreated(Random.nextInt(players.size), Step.preCombatMain, players, Instant.now()))
                   ++ players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }
                   ++ players.keys.map(Drawn(OPENING_HAND, _))
               ).thenReply(replyTo)(state => StatusReply.Success(state))
@@ -176,7 +177,7 @@ object Engine {
     state match {
       case EmptyState =>
         event match {
-          case GameCreated(die: Int, players: Map[String, Deck]) =>
+          case GameCreated(die, step, players, createdAt) =>
             val startingUser = players.keys.toIndexedSeq(die)
             val decksWithIndex = players.zipWithIndex.toMap.map { case ((name, deck), playerIndex) =>
               (name, ListMap(deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex*100), UnPlayed(p._1, name, name))).sortBy(_._1):_*))
@@ -187,6 +188,8 @@ object Engine {
               startingUser,
               decksWithIndex.view.mapValues(PlayerState(_)).toMap,
               decksWithIndex.flatMap(p => p._2.map(c => (c._1, Library(p._1).asInstanceOf[Zone[CardState[Card]]]))),
+              currentStep = step,
+              createdAt = createdAt
             )
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }

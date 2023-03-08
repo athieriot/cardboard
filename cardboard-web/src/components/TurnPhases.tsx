@@ -1,25 +1,39 @@
 import './TurnPhases.css'
+import {useEffect} from "react";
 
-enum Step {
-    Untap = 'unTap',
-    Upkeep = 'upKeep',
-    Draw = 'draw',
-    PreCambatMain = 'preCombatMain',
-    BeginningOfCombat = 'beginningOfCombat',
-    DeclareAttackers = 'declareAttackers',
-    DeclareBlockers = 'declareBlockers',
-    CombatDamage = 'combatDamage',
-    EndOfCombat = 'endOfCombat',
-    PostCombatMain = 'postCombatMain',
-    End = 'end',
-    Cleanup = 'cleanup',
+export enum Step {
+    unTap = 'unTap',
+    upKeep = 'upKeep',
+    draw = 'draw',
+    preCombatMain = 'preCombatMain',
+    beginningOfCombat = 'beginningOfCombat',
+    declareAttackers = 'declareAttackers',
+    declareBlockers = 'declareBlockers',
+    combatDamage = 'combatDamage',
+    endOfCombat = 'endOfCombat',
+    postCombatMain = 'postCombatMain',
+    end = 'end',
+    cleanup = 'cleanup',
 }
 
-const TurnPhases = () => {
+interface Props {
+    currentStep: keyof typeof Step
+}
+
+interface TurnProps {
+    currentStep: keyof typeof Step
+    step: keyof typeof Step
+}
+
+const TurnPhases = ({ currentStep }: Props) => {
+    useEffect(() => {
+        console.log(currentStep)
+    }, [currentStep])
+
     return <div className='turn_phase_content'>
-        {((Object.keys(Step) as (keyof typeof Step)[]).map((step) => (
-            <span key={step}>{step}</span>
-        )))}
+        {(Object.keys(Step) as (keyof typeof Step)[]).map((step) => (
+            currentStep == step ? <span><strong>{step}</strong></span> : <span>{step}</span>
+        ))}
     </div>
 }
 

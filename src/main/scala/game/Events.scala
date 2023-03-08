@@ -2,10 +2,14 @@ package game
 
 import akka.actor.typed.ActorRef
 import akka.pattern.StatusReply
+import com.fasterxml.jackson.annotation.JsonTypeInfo.As
+import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
 import game.*
 import game.cards.*
 import game.mana.*
 import game.mechanics.*
+
+import java.time.Instant
 
 /**
  * EventSourcing Behavior Commands
@@ -37,8 +41,12 @@ final case class Discard(replyTo: ActorRef[StatusReply[State]], player: PlayerId
  */
 sealed trait Event
 
+// TODO: Move to Card ?
+case class SimpleCard(name: String, set: String, numberInSet: Int)
+
 // TODO: Mulligan ?
-final case class GameCreated(die: Int, players: Map[String, Deck]) extends Event
+final case class GameCreated(die: Int, step: Step, players: Map[String, Deck], createdAt: Instant) extends Event
+final case class GameCreatedSimplified(die: Int, step: Step, players: Map[String, List[SimpleCard]], createdAt: Instant) extends Event
 final case class GameEnded(loser: String) extends Event
 
 sealed trait TurnBaseEvent extends Event

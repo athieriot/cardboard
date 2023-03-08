@@ -1,17 +1,17 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
+import {useEffect, useState} from 'react'
 import './App.css'
-import CardPreview from "./components/CardPreview";
-import TurnPhases from "./components/TurnPhases";
+import CardPreview from './components/CardPreview'
+import TurnPhases from './components/TurnPhases'
+import useGameState from "./useGameState";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { currentStep, readyState} = useGameState()
 
   return (
     <>
       <div className="zone Turn"></div>
       <div className="zone Phases">
-          <TurnPhases />
+          <TurnPhases currentStep={currentStep} />
       </div>
       <div className="zone Hand-1"></div>
       <div className="zone Player-1"></div>
