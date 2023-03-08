@@ -1,4 +1,4 @@
-.container {  display: grid;
+.board {  display: grid;
   grid-template-columns: 0.3fr 1.7fr;
   grid-template-rows: 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr 1.1fr 0.3fr;
   grid-auto-flow: row;
@@ -41,16 +41,15 @@
 
 .Preview { grid-area: Preview; }
 
-
 /* For presentation only, no need to copy the code below */
-.container .zone {
+.board .zone {
   border: 2px solid;
   position: relative;
   border-image: url('https://cdn.dribbble.com/users/417348/screenshots/2839244/attachments/583820/wood-texture-hd.jpg') 10;
   background-image: url('https://www.designbolts.com/wp-content/uploads/2021/01/white-wood-bck-1.jpg');
 }
 
-.container *:after {
+.board *:after {
   position: absolute;
   top: 0;
   left: 0;

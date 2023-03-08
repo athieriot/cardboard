@@ -1,5 +1,7 @@
 import './TurnPhases.css'
 import {useEffect} from "react";
+import {Badge} from "flowbite-react"
+import {CheckIcon, ClockIcon} from "@heroicons/react/20/solid";
 
 export enum Step {
     unTap = 'unTap',
@@ -32,7 +34,7 @@ const TurnPhases = ({ currentStep }: Props) => {
 
     return <div className='turn_phase_content'>
         {(Object.keys(Step) as (keyof typeof Step)[]).map((step) => (
-            currentStep == step ? <span><strong>{step}</strong></span> : <span>{step}</span>
+            <Badge key={step} color={currentStep == step ? "success" : "light"}>{step}</Badge>
         ))}
     </div>
 }
