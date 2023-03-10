@@ -93,8 +93,8 @@ class Server(actorSystem: ActorSystem[Nothing]) extends Directives with JsonSupp
   private def messageOutSource(id: UUID): Source[TextMessage, NotUsed] = {
     readJournal.eventsByPersistenceId(id.toString, 0L, Long.MaxValue)
       .map(e => { e.copy(event = e.event match {
-        case GameCreated(die, step, players, createdAt) =>
-          GameCreatedSimplified(die, step, players.view.mapValues(d => d.cards.map(c => SimpleCard(c.name, c.set, c.numberInSet))).toMap, createdAt)
+        case GameCreated(die, step, players) =>
+          GameCreatedSimplified(die, step, players.view.mapValues(d => d.map(c => (c._1, SimpleCard(c._2.name, c._2.set, c._2.numberInSet)))).toMap)
         case other: Event => other
       })})
       .map(e => EventEnvelope[Event](e.offset, e.persistenceId, e.sequenceNr, e.event.asInstanceOf[Event], e.timestamp, e.event.getClass.getSimpleName, 0))

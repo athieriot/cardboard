@@ -7,13 +7,16 @@ import akka.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import akka.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
 import akka.persistence.typed.PersistenceId
 import com.typesafe.config.ConfigFactory
+import game.Engine.idify
 import game.cards.*
 import game.cards.types.*
 import game.mechanics.*
 import helpers.TestSuiteWithActorTestKit
+
 import scala.collection.immutable.ListMap
 import utest.*
 
+import java.time.Instant
 import java.util.UUID
 import scala.util.Random
 
@@ -51,7 +54,7 @@ object EngineSetupTest extends TestSuiteWithActorTestKit(EventSourcedBehaviorTes
         val result = eventSourcedTestKit.runCommand[StatusReply[State]](c => New(c, Map(player -> testingDeck)))
         assert(result.reply.isSuccess)
         assert(result.events.size == 3)
-        assert(result.events.contains(GameCreated(0, Map(player -> testingDeck))))
+        assert(result.events.contains(GameCreated(0, Step.preCombatMain, Map(player -> idify(testingDeck, 0)))))
         assertMatch(result.events.find(_.isInstanceOf[Shuffled])) { case Some(Shuffled(_, "Jill")) => }
         assert(result.events.contains(Drawn(7, player)))
 

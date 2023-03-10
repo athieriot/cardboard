@@ -7,6 +7,7 @@ import akka.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import akka.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
 import akka.persistence.typed.PersistenceId
 import com.typesafe.config.ConfigFactory
+import game.Engine.idify
 import game.EngineSetupTest.eventSourcedTestKit
 import game.cards.*
 import game.cards.types.*
@@ -18,6 +19,7 @@ import helpers.TestSuiteWithActorTestKit
 import scala.collection.immutable.ListMap
 import utest.*
 
+import java.time.Instant
 import java.util.UUID
 
 object EngineStandardGameTest extends TestSuiteWithActorTestKit(EventSourcedBehaviorTestKit.config) {
@@ -42,7 +44,7 @@ object EngineStandardGameTest extends TestSuiteWithActorTestKit(EventSourcedBeha
   )
 
   val tests: Tests = Tests {
-    eventSourcedTestKit.initialize(List(GameCreated(0, players), DamageDealt("Jill", 19), Drawn(7, "Jack"), Drawn(7, "Jill")):_*)
+    eventSourcedTestKit.initialize(List(GameCreated(0, Step.preCombatMain, idify(players)), DamageDealt("Jill", 19), Drawn(7, "Jack"), Drawn(7, "Jill")):_*)
 
     test("Standard Game") {
 

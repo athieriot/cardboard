@@ -45,8 +45,8 @@ sealed trait Event
 case class SimpleCard(name: String, set: String, numberInSet: Int)
 
 // TODO: Mulligan ?
-final case class GameCreated(die: Int, step: Step, players: Map[String, Deck], createdAt: Instant) extends Event
-final case class GameCreatedSimplified(die: Int, step: Step, players: Map[String, List[SimpleCard]], createdAt: Instant) extends Event
+final case class GameCreated(die: Int, step: Step, players: Map[String, List[(Int, Card)]]) extends Event
+final case class GameCreatedSimplified(die: Int, step: Step, players: Map[String, List[(Int, SimpleCard)]]) extends Event
 final case class GameEnded(loser: String) extends Event
 
 sealed trait TurnBaseEvent extends Event

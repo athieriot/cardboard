@@ -10,10 +10,19 @@ interface Envelope<T> {
     event: T
     entityType: string
 }
+
+interface Card {
+    name: string
+    set: string
+    numberInSet: number
+}
+
+type Library = [number, Card]
+
 interface GameCreated {
     die: number
     step: Step
-    createdAt: string
+    players: Record<string, [number, Library]>
 }
 
 const useGameState = () => {

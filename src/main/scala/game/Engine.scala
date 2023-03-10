@@ -29,6 +29,9 @@ object Engine {
 
   def randomOrder(n: Int) = Random.shuffle(1 to n * 2).toList
 
+  def idify(deck: Deck, playerIndex: Int): Map[Int, Card] = ListMap(deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex * 100), p._1)).sortBy(_._1): _*)
+  def idify(players: Map[String, Deck]): Map[String, Map[CardId, Card]] = players.zipWithIndex.map { case ((name, deck), playerIndex) => (name, idify(deck, playerIndex)) }.toMap
+
   private val commandHandler: (State, Action) => ReplyEffect[Event, State] = { (state, command) =>
     state match {
       case EndState(_) => Effect.noReply
@@ -40,7 +43,7 @@ object Engine {
               Effect.none.thenReply(replyTo)(_ => StatusReply.Error(s"Deck invalid"))
             else
               Effect.persist(
-                List(GameCreated(Random.nextInt(players.size), Step.preCombatMain, players, Instant.now()))
+                List(GameCreated(Random.nextInt(players.size), Step.preCombatMain, idify(players).view.mapValues(_.toList).toMap))
                   ++ players.map { case (player, deck) => Shuffled(randomOrder(deck.cards.size), player) }
                   ++ players.keys.map(Drawn(OPENING_HAND, _))
               ).thenReply(replyTo)(state => StatusReply.Success(state))
@@ -177,19 +180,16 @@ object Engine {
     state match {
       case EmptyState =>
         event match {
-          case GameCreated(die, step, players, createdAt) =>
-            val startingUser = players.keys.toIndexedSeq(die)
-            val decksWithIndex = players.zipWithIndex.toMap.map { case ((name, deck), playerIndex) =>
-              (name, ListMap(deck.cards.zipWithIndex.map(p => (p._2 + (playerIndex*100), UnPlayed(p._1, name, name))).sortBy(_._1):_*))
-            }
+          case GameCreated(die, step, players) =>
+            val startingUser = players.toMap.keys.toIndexedSeq(die)
+            val deck = players.toMap.map(p => (p._1, ListMap(p._2.map(c => (c._1, UnPlayed(c._2, p._1, p._1))).toList: _*)))
 
             BoardState(
               startingUser,
               startingUser,
-              decksWithIndex.view.mapValues(PlayerState(_)).toMap,
-              decksWithIndex.flatMap(p => p._2.map(c => (c._1, Library(p._1).asInstanceOf[Zone[CardState[Card]]]))),
-              currentStep = step,
-              createdAt = createdAt
+              deck.view.mapValues(PlayerState(_)).toMap,
+              deck.flatMap(p => p._2.map(c => (c._1, Library(p._1).asInstanceOf[Zone[CardState[Card]]])).toList),
+              currentStep = step
             )
           case _ => throw new IllegalStateException(s"unexpected event [$event] in state [$state]")
         }
