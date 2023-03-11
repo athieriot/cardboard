@@ -4,11 +4,11 @@
   grid-auto-flow: row;
   grid-template-areas:
     "Player-2 Hands-2"
-    "Library-2 Lands-2"
+    "Preview Lands-2"
     "Preview Permanents-2"
     "Preview Stack---Attack"
     "Preview Permanents-1"
-    "Library-1 Lands-1"
+    "Preview Lands-1"
     "Player-1 Hand-1"
     "Turn Phases";
 }
@@ -34,10 +34,6 @@
 .Hands-2 { grid-area: Hands-2; }
 
 .Player-2 { grid-area: Player-2; }
-
-.Library-2 { grid-area: Library-2; }
-
-.Library-1 { grid-area: Library-1; }
 
 .Preview { grid-area: Preview; }
 
