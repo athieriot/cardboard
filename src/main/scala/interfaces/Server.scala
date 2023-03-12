@@ -16,7 +16,9 @@ import akka.serialization.{Serialization, SerializationExtension}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
+import ch.megard.akka.http.cors.scaladsl.model.HttpHeaderRange
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import collection.sets.{FourthEdition, PortalThreeKingdoms}
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As
 import com.fasterxml.jackson.annotation.{JsonSubTypes, JsonTypeInfo}
@@ -32,7 +34,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.io.StdIn
 
-case class WebCommand(name: String, player: PlayerId, id: CardId, args: List[String])
+case class WebCommand(name: String, player: PlayerId, id: Option[CardId], args: Option[List[String]])
 
 trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val webCommandFormat: RootJsonFormat[WebCommand] = jsonFormat4(WebCommand.apply)
@@ -53,7 +55,7 @@ class Server(actorSystem: ActorSystem[Nothing]) extends Directives with JsonSupp
 
     val bindingFuture = Http()
       .newServerAt("localhost", 8080)
-      .bind(cors() { webSocketRoute(id) ~ httpRoute(cardboard) })
+      .bind(cors() { httpRoute(cardboard) ~ webSocketRoute(id) })
 
     println(s"Server now online. Please navigate to http://localhost:8080/hello\nPress RETURN to stop...")
     StdIn.readLine() // let it run until user presses return
@@ -80,9 +82,12 @@ class Server(actorSystem: ActorSystem[Nothing]) extends Directives with JsonSupp
       post {
         entity(as[WebCommand]) {
           // TODO: Args
-          case WebCommand("play", player, id, _) =>
+          case WebCommand("play", player, Some(id), _) =>
             // TODO: Error Handling
             cardBoard ! PlayLand(system.ignoreRef, player, id, List())
+            complete("Command sent")
+          case WebCommand("next", player, _, _) =>
+            cardBoard ! Next(system.ignoreRef, player)
             complete("Command sent")
           case _ => complete(StatusCodes.InternalServerError -> "Command not found")
         }

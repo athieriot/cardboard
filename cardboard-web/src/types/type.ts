@@ -7,4 +7,5 @@ export interface Card {
     numberInSet: number
 }
 
-export type Zone = [[CardId, Card]?]
+export type ZoneEntry = [CardId, Card]
+export type Zone = [ZoneEntry?]

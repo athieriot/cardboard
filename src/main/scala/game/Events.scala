@@ -59,7 +59,7 @@ case object CombatEnded extends TurnBaseEvent
 final case class Stacked(id: CardId, player: PlayerId, args: List[Arg[_]]) extends Event
 final case class StackedAbility(id: CardId, abilityId: Int, player: PlayerId, args: List[Arg[_]]) extends Event
 final case class LandPlayed(id: CardId, player: PlayerId) extends Event
-final case class EnteredTheBattlefield(id: CardId) extends Event
+final case class EnteredTheBattlefield(id: CardId, player: PlayerId) extends Event
 final case class PutIntoGraveyard(id: CardId, player: PlayerId) extends Event
 
 final case class Tapped(id: CardId) extends Event

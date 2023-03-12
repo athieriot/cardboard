@@ -12,9 +12,9 @@ const Hand = ({ hand, onHover }: Props) => {
         {(hand || []).filter(kv => (kv || [])[1]).map((kv) => {
             const [id, card] = kv || []
 
-            if (!card) return <></>
+            if (!card || !id) return <></>
 
-            return <Card key={id} card={card} onHover={onHover} />
+            return <Card key={id} cardId={id} card={card} onHover={onHover} />
         })}
     </>
 }

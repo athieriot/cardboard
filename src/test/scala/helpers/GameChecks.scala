@@ -15,7 +15,7 @@ object GameChecks {
   def playLandCheck(id: CardId, player: PlayerId, cardsInHand: Int)(implicit eventSourcedTestKit: EventSourcedBehaviorTestKit[Action, Event, State]) = {
     val result = eventSourcedTestKit.runCommand[StatusReply[State]](PlayLand(_, player, id, List()))
     assert(result.reply.isSuccess)
-    assert(result.events.diff(List(LandPlayed(id, player), EnteredTheBattlefield(id))).isEmpty)
+    assert(result.events.diff(List(LandPlayed(id, player), EnteredTheBattlefield(id, player))).isEmpty)
     assert(result.stateOfType[BoardState].listCardsFromZone(Battlefield).exists(_._1 == id))
     assert(result.stateOfType[BoardState].listCardsFromZone(Hand(player)).size == cardsInHand)
   }
@@ -39,7 +39,7 @@ object GameChecks {
   def resolvePermanentCheck(id: CardId, player: PlayerId, nextPlayer: PlayerId, extraEvents: Event*)(implicit eventSourcedTestKit: EventSourcedBehaviorTestKit[Action, Event, State]) = {
     val result = eventSourcedTestKit.runCommand[StatusReply[State]](Resolve(_, player))
     assert(result.reply.isSuccess)
-    assert(result.events.diff(List(EnteredTheBattlefield(id), PriorityPassed(nextPlayer))).isEmpty)
+    assert(result.events.diff(List(EnteredTheBattlefield(id, player), PriorityPassed(nextPlayer))).isEmpty)
     assert(result.stateOfType[BoardState].listCardsFromZone(Stack).isEmpty)
     assert(result.stateOfType[BoardState].listCardsFromZone(Battlefield).exists(_._1 == id))
   }

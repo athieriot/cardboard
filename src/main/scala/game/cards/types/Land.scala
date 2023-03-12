@@ -24,5 +24,5 @@ abstract class Land extends PermanentCard {
       throw new RuntimeException("You already played a land this turn")
   }
   
-  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(LandPlayed(id, ctx.player), EnteredTheBattlefield(id))
+  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(LandPlayed(id, ctx.player), EnteredTheBattlefield(id, ctx.player))
 }

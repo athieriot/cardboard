@@ -1,7 +1,7 @@
 import useWebSocket from 'react-use-websocket'
 import {Reducer, useReducer, useState} from 'react'
-import { Step } from './components/TurnPhases'
-import {Library, PlayerId, Zone} from "./types/type";
+import { Step } from '../components/Phases'
+import {CardId, Library, PlayerId, Zone, ZoneEntry} from "../types/type";
 
 interface Envelope<T> {
     offset: { value: number }
@@ -17,19 +17,31 @@ interface Event { }
 interface GameCreated extends Event {
     die: number
     step: Step
-    players: Record<string, Zone>
+    players: Record<PlayerId, Zone>
 }
 
 interface Shuffled extends Event {
     order: number[]
-    player: String
+    player: PlayerId
 }
 
 interface Drawn extends Event {
     amount: number
-    player: String
+    player: PlayerId
 }
 
+interface MovedToStep extends Event {
+    phase: Step
+}
+
+interface PriorityPassed extends Event {
+    to: PlayerId
+}
+
+interface EnteredTheBattlefield extends Event {
+    id: CardId
+    player: PlayerId
+}
 
 interface State {
     currentPlayer?: PlayerId
@@ -37,14 +49,15 @@ interface State {
     currentStep: Step
     libraries: Record<string, Zone>
     hands: Record<string, Zone>
+    battlefield: Record<string, Zone>
 }
 
 const initialState = {
     currentStep: Step.unTap,
     libraries: {},
-    hands: {}
+    hands: {},
+    battlefield: {}
 }
-
 
 const useGameState = () => {
 
@@ -102,6 +115,36 @@ const useGameState = () => {
                         ...state.hands,
                         ...{[drawn.player]: (state.hands[drawn.player] || []).concat(cards)}
                     }
+                }
+            case 'EnteredTheBattlefield':
+                const etb = (action.event as EnteredTheBattlefield)
+
+                const card = (state.hands[etb.player] || []).find((e: ZoneEntry) => e.at(0) === etb.id)
+
+                return {
+                    ...state,
+                    battlefield: {
+                        ...state.battlefield,
+                        ...{[etb.player]: (state.battlefield[etb.player] || []).concat([card])},
+                    },
+                    hands: {
+                        ...state.hands,
+                        ...{[etb.player]: (state.hands[etb.player] || []).filter((e: ZoneEntry) => e.at(0) !== etb.id)},
+                   },
+                }
+            case 'MovedToStep':
+                const mts = (action.event as MovedToStep)
+
+                return {
+                    ...state,
+                    currentStep: mts.phase
+                }
+            case 'PriorityPassed':
+                const pp = (action.event as PriorityPassed)
+
+                return {
+                    ...state,
+                    currentPriority: pp.to
                 }
         }
 

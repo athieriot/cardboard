@@ -1,7 +1,6 @@
-import './TurnPhases.css'
+import './Phases.css'
 import {useEffect} from "react";
 import {Badge} from "flowbite-react"
-import {CheckIcon, ClockIcon} from "@heroicons/react/20/solid";
 
 export enum Step {
     unTap = 'unTap',
@@ -27,7 +26,7 @@ interface TurnProps {
     step: keyof typeof Step
 }
 
-const TurnPhases = ({ currentStep }: Props) => {
+const Phases = ({ currentStep }: Props) => {
     useEffect(() => {
         console.log(currentStep)
     }, [currentStep])
@@ -39,4 +38,4 @@ const TurnPhases = ({ currentStep }: Props) => {
     </div>
 }
 
-export default TurnPhases
+export default Phases

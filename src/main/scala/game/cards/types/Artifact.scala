@@ -19,5 +19,5 @@ abstract class Artifact extends PermanentCard {
       throw new RuntimeException("You can only play artifacts when the stack is empty")
   }
 
-  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(EnteredTheBattlefield(id))
+  def effects(id: CardId, ctx: Context, cardState: CardState[Card]): List[Event] = List(EnteredTheBattlefield(id, ctx.player))
 }

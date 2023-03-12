@@ -250,7 +250,7 @@ object Engine {
               }
             }
 
-          case EnteredTheBattlefield(id) =>
+          case EnteredTheBattlefield(id, _) =>
             state.getCard(id) match {
               case None => state
               case Some(result) => result match {
