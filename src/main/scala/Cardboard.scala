@@ -10,7 +10,7 @@ import akka.persistence.query.PersistenceQuery
 import akka.persistence.query.typed.EventEnvelope
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import game.*
-import interfaces.{CommandLine, Server}
+import interfaces.{CommandLine, ServerActor}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.serialization.SerializationExtension
 import akka.util.ByteString
@@ -37,11 +37,11 @@ import scala.io.StdIn
       
     case "web" :: args =>
       val id = args.headOption.map(UUID.fromString).getOrElse(UUID.randomUUID())
-      val system = ActorSystem(Behaviors.empty, "web")
+      val system: ActorSystem[ServerActor.ServerStatus] = ActorSystem(ServerActor("localhost", 8080, id), "server")
 
       println(s"Start game server: $id")
-      
-      new Server(system).start(id)
+
+      Await.ready(system.whenTerminated, Duration.Inf)
     case Nil => println("Please choose an interface between 'web' and 'console'")
   }
 }

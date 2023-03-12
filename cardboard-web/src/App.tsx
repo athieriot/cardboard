@@ -16,7 +16,7 @@ import Turn from "./components/Turn";
 function App() {
   const { state, readyState} = useGameState()
   const [preview, setPreview] = useState("")
-  const { dragHandler } = useCommandHandler(state.currentPlayer)
+  const { dragHandler } = useCommandHandler(state.activePlayer)
 
   const player1 = Object.keys(state.libraries).at(0)
   const player2 = Object.keys(state.libraries).at(1)
@@ -24,14 +24,14 @@ function App() {
   return (
     <DndContext onDragEnd={dragHandler}>
       <div className="zone Turn">
-          <Turn currentPlayer={state.currentPlayer} />
+          <Turn currentStep={state.currentStep} activePlayer={state.activePlayer} />
       </div>
       <div className="zone Phases">
           <Phases currentStep={state.currentStep} />
       </div>
 
       <div className={classNames("zone Player-1")}>
-            <Player currentPlayer={state.currentPlayer}  name={player1} library={Object.values(state.libraries).at(0)} />
+            <Player activePlayer={state.activePlayer}  name={player1} library={Object.values(state.libraries).at(0)} />
         </div>
       <div className="zone Hand-1 grid-cols-7 grid">
           <Hand hand={Object.values(state.hands).at(0)} onHover={(url) => setPreview(url)} />
@@ -54,7 +54,7 @@ function App() {
       </div>
 
       <div className={classNames("zone Player-2")}>
-          <Player currentPlayer={state.currentPlayer} name={player2} library={Object.values(state.libraries).at(1)} />
+          <Player activePlayer={state.activePlayer} name={player2} library={Object.values(state.libraries).at(1)} />
       </div>
       <div className="zone Preview flex items-center">
         <CardPreview preview={preview} />

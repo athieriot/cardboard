@@ -44,7 +44,7 @@ interface EnteredTheBattlefield extends Event {
 }
 
 interface State {
-    currentPlayer?: PlayerId
+    activePlayer?: PlayerId
     currentPriority?: PlayerId
     currentStep: Step
     libraries: Record<string, Zone>
@@ -70,17 +70,14 @@ const useGameState = () => {
                 const player1 = Object.keys(game.players).at(0)
                 const player2 = Object.keys(game.players).at(1)
 
-                const library1 = player1 ? { [player1]: game.players[player1] } : {}
-                const library2 = player2 ? { [player2]: game.players[player2] } : {}
-
                 return {
                     ...state,
                     currentStep: game.step,
-                    currentPlayer: currentPlayer,
+                    activePlayer: currentPlayer,
                     currentPriority: currentPlayer,
                     libraries: {
-                        ...library1,
-                        ...library2
+                        ...(player1 ? { [player1]: game.players[player1] } : {}),
+                        ...(player2 ? { [player2]: game.players[player2] } : {})
                     },
                 }
             case 'Shuffled':
@@ -145,6 +142,14 @@ const useGameState = () => {
                 return {
                     ...state,
                     currentPriority: pp.to
+                }
+            case 'TurnEnded$':
+                const player1Name = Object.keys(state.libraries).at(0)
+                const player2Name = Object.keys(state.libraries).at(1)
+
+                return {
+                    ...state,
+                    activePlayer: state.activePlayer === player1Name ? player2Name : player1Name
                 }
         }
 

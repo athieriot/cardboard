@@ -4,17 +4,17 @@ import {FireIcon} from "@heroicons/react/20/solid";
 
 interface Props {
     name?: string
-    currentPlayer?: string
+    activePlayer?: string
     library?: Zone
 }
 
-const Player = ({ currentPlayer, name, library }: Props) => {
+const Player = ({ activePlayer, name, library }: Props) => {
 
     return (
         <>
             <div><b>{name}</b></div>
             Library: {library?.length}
-            {currentPlayer === name && <FireIcon className="h-5 w-5 text-red-600" />}
+            {activePlayer === name && <FireIcon className="h-5 w-5 text-red-600" />}
         </>
     )
 }
