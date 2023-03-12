@@ -1,11 +1,11 @@
-import {Library} from "../types/type";
+import {Zone} from "../types/type";
 import React from "react";
 import {FireIcon} from "@heroicons/react/20/solid";
 
 interface Props {
     name?: string
     currentPlayer?: string
-    library?: Library
+    library?: Zone
 }
 
 const Player = ({ currentPlayer, name, library }: Props) => {

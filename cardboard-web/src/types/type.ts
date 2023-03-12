@@ -1,4 +1,5 @@
 export type CardId = number
+export type PlayerId = string
 
 export interface Card {
     name: string
@@ -6,4 +7,4 @@ export interface Card {
     numberInSet: number
 }
 
-export type Library = [[CardId, Card]?]
+export type Zone = [[CardId, Card]?]
