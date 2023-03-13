@@ -100,8 +100,14 @@ object ServerActor extends Directives with JsonSupport {
       readJournal.eventsByPersistenceId(id.toString, 0L, Long.MaxValue)
         .map(e => {
           e.copy(event = e.event match {
+            // TODO: Now we can use the normal GameCreated object !!
             case GameCreated(die, step, players) =>
-              GameCreatedSimplified(die, step, players.view.mapValues(d => d.map(c => (c._1, SimpleCard(c._2.name, c._2.set, c._2.numberInSet)))).toMap)
+              GameCreatedSimplified(die, step, players.view.mapValues(d => d.map(c => (c._1, SimpleCard(
+                c._2.name,
+                c._2.set,
+                c._2.numberInSet,
+                c._2.activatedAbilities.map(a => (a._1, a._2.text)).toList
+              )))).toMap)
             case other: Event => other
           })
         })

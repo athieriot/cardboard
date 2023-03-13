@@ -14,7 +14,7 @@ const Battlefield = ({ zoneId, cards, onHover }: Props) => {
         id: zoneId,
     });
 
-    return <div ref={setNodeRef} className={classNames({'overlay': isOver})}>
+    return <div ref={setNodeRef} className={classNames('grid-cols-7 grid', {'overlay': isOver})}>
         {zoneId}
         {(cards || []).filter(kv => (kv || [])[1]).map((kv) => {
             const [id, card] = kv || []

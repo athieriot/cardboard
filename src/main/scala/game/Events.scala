@@ -42,7 +42,7 @@ final case class Discard(replyTo: ActorRef[StatusReply[State]], player: PlayerId
 sealed trait Event
 
 // TODO: Move to Card ?
-case class SimpleCard(name: String, set: String, numberInSet: Int)
+case class SimpleCard(name: String, set: String, numberInSet: Int, abilities: List[(Int, String)])
 
 // TODO: Mulligan ?
 final case class GameCreated(die: Int, step: Step, players: Map[String, List[(Int, Card)]]) extends Event

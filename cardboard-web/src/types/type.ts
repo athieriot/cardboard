@@ -5,6 +5,7 @@ export interface Card {
     name: string
     set: string
     numberInSet: number
+    abilities: [[number, string]]
 }
 
 export type ZoneEntry = [CardId, Card]
